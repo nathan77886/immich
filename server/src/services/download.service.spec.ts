@@ -1,9 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
+import fs from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { DownloadResponseDto } from 'src/dtos/download.dto';
+import { AssetType, JobName } from 'src/enum';
 import { DownloadService } from 'src/services/download.service';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { authStub } from 'test/fixtures/auth.stub';
+import { getForAsset } from 'test/mappers';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 import { vitest } from 'vitest';
 
@@ -27,6 +30,58 @@ describe(DownloadService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(DownloadService));
+  });
+
+  describe('createExport', () => {
+    it('queues a compatible export and persists its manifest atomically', async () => {
+      const asset = AssetFactory.create({ type: AssetType.Video });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      vitest.spyOn(fs, 'writeFile').mockResolvedValue();
+      vitest.spyOn(fs, 'rename').mockResolvedValue();
+
+      const result = await sut.createExport(authStub.admin, {
+        assetId: asset.id,
+        format: 'mp4-h264',
+        resolution: '2160',
+        quality: 90,
+      });
+
+      expect(result.status).toBe('queued');
+      expect(fs.rename).toHaveBeenCalledOnce();
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetExport,
+        data: { exportId: result.id, userId: authStub.admin.user.id },
+      });
+    });
+
+    it('rejects an image format for a video', async () => {
+      const asset = AssetFactory.create({ type: AssetType.Video });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+
+      await expect(
+        sut.createExport(authStub.admin, { assetId: asset.id, format: 'jpeg', resolution: '2160', quality: 90 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects unsafe user ids before writing an export manifest', async () => {
+      const asset = AssetFactory.create({ type: AssetType.Video });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+
+      await expect(
+        sut.createExport(
+          { ...authStub.admin, user: { ...authStub.admin.user, id: '../outside' } },
+          {
+            assetId: asset.id,
+            format: 'mp4-h264',
+            resolution: '2160',
+            quality: 90,
+          },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 
   describe('downloadArchive', () => {

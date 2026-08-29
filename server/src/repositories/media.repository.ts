@@ -411,6 +411,41 @@ export class MediaRepository {
     });
   }
 
+  exportVideo(
+    input: string,
+    output: string,
+    options: { codec: 'h264' | 'hevc'; resolution: 'original' | '1080' | '1440' | '2160'; crf: number },
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const command = ffmpeg(input)
+        .videoCodec(options.codec === 'hevc' ? 'libx265' : 'libx264')
+        .audioCodec('aac')
+        .outputOptions('-crf', String(options.crf), '-movflags', '+faststart', '-pix_fmt', 'yuv420p');
+      if (options.resolution !== 'original') {
+        command.videoFilters(
+          `scale=${options.resolution}:${options.resolution}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
+        );
+      }
+      command
+        .on('error', reject)
+        .on('end', () => resolve())
+        .save(output);
+    });
+  }
+
+  async exportImage(
+    input: string | Buffer,
+    output: string,
+    options: { format: 'jpeg' | 'png' | 'webp'; resolution: 'original' | '1080' | '1440' | '2160'; quality: number },
+  ): Promise<void> {
+    let pipeline = sharp(input, { failOn: 'error', limitInputPixels: false }).rotate();
+    if (options.resolution !== 'original') {
+      const resolution = Number(options.resolution);
+      pipeline = pipeline.resize(resolution, resolution, { fit: 'inside', withoutEnlargement: true });
+    }
+    await pipeline.toFormat(options.format, { quality: options.quality }).toFile(output);
+  }
+
   async getImageMetadata(input: string | Buffer): Promise<ImageDimensions & { isTransparent: boolean }> {
     const { width = 0, height = 0, hasAlpha = false } = await sharp(input, { unlimited: true }).metadata();
     return { width, height, isTransparent: hasAlpha };

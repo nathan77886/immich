@@ -1630,6 +1630,24 @@ export type DownloadArchiveDto = {
     /** Download edited asset if available */
     edited?: boolean;
 };
+export type ExportResponseDto = {
+    assetId: string;
+    createdAt: string;
+    error: string | null;
+    fileName: string | null;
+    format: Format;
+    id: string;
+    quality?: number;
+    resolution: Resolution;
+    status: Status;
+    updatedAt: string;
+};
+export type ExportCreateDto = {
+    assetId: string;
+    format: Format;
+    quality?: number;
+    resolution: Resolution;
+};
 export type DownloadInfoDto = {
     /** Album ID to download */
     albumId?: string;
@@ -5282,6 +5300,36 @@ export function downloadArchive({ key, slug, downloadArchiveDto }: {
         body: downloadArchiveDto
     })));
 }
+export function listExports(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: ExportResponseDto[];
+    }>("/download/exports", {
+        ...opts
+    }));
+}
+export function createExport({ exportCreateDto }: {
+    exportCreateDto: ExportCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: ExportResponseDto;
+    }>("/download/exports", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: exportCreateDto
+    })));
+}
+export function downloadExport({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/download/exports/${encodeURIComponent(id)}`, {
+        ...opts
+    }));
+}
 /**
  * Retrieve download information
  */
@@ -8120,6 +8168,25 @@ export enum AssetMediaSize {
     Preview = "preview",
     Thumbnail = "thumbnail"
 }
+export enum Format {
+    Mp4H264 = "mp4-h264",
+    Mp4Hevc = "mp4-hevc",
+    Jpeg = "jpeg",
+    Png = "png",
+    Webp = "webp"
+}
+export enum Resolution {
+    $1080 = "1080",
+    $1440 = "1440",
+    $2160 = "2160",
+    Original = "original"
+}
+export enum Status {
+    Queued = "queued",
+    Processing = "processing",
+    Ready = "ready",
+    Failed = "failed"
+}
 export enum SourceType {
     MachineLearning = "machine-learning",
     Exif = "exif",
@@ -8199,6 +8266,7 @@ export enum QueueJobStatus {
     Paused = "paused"
 }
 export enum JobName {
+    AssetExport = "AssetExport",
     AssetDelete = "AssetDelete",
     AssetDeleteCheck = "AssetDeleteCheck",
     AssetDetectFacesQueueAll = "AssetDetectFacesQueueAll",

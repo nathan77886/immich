@@ -14,7 +14,8 @@ permissions: {}
 jobs:
   migration-order:
     name: Verify migration ORDER
-    if: ${{ !github.event.created }}
+    # Fork main pushes have no meaningful upstream BASE_SHA and can fail append-only checks.
+    if: ${{ !github.event.created && (github.event_name != 'push' || github.repository == 'immich-app/immich') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

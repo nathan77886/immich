@@ -13,6 +13,8 @@ permissions: {}
 
 jobs:
   pre-job:
+    # Fork main syncs can span many upstream commits; validate fork changes on pull requests instead.
+    if: ${{ github.event_name != 'push' || github.repository == 'immich-app/immich' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -79,7 +81,12 @@ jobs:
       - name: Perform codegen
         run: mise //mobile:codegen
 
-      - name: Run analyze
+      - name: Run Dart analyze
+        if: ${{ github.repository != 'immich-app/immich' }}
+        run: mise //mobile:analyze:dart
+
+      - name: Run Dart and DCM analyze
+        if: ${{ github.repository == 'immich-app/immich' }}
         run: mise //mobile:analyze
 
       - name: Run format
