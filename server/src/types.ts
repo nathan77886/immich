@@ -335,6 +335,7 @@ export interface JobCounts {
 }
 
 export type JobItem =
+  | { name: JobName.AssetExport; data: { exportId: string; userId: string } }
   // Audit
   | { name: JobName.AuditTableCleanup; data?: IBaseJob }
 

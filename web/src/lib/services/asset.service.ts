@@ -19,6 +19,7 @@ import {
   mdiDatabaseRefreshOutline,
   mdiDownload,
   mdiDownloadBox,
+  mdiFileExportOutline,
   mdiFaceRecognition,
   mdiHeadSyncOutline,
   mdiHeart,
@@ -45,6 +46,7 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import AssetAddToAlbumModal from '$lib/modals/AssetAddToAlbumModal.svelte';
+import AssetExportModal from '$lib/modals/AssetExportModal.svelte';
 import AssetTagModal from '$lib/modals/AssetTagModal.svelte';
 import ProfileImageCropperModal from '$lib/modals/ProfileImageCropperModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
@@ -125,6 +127,14 @@ export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto & 
     icon: mdiDownloadBox,
     $if: () => !!authUser && asset.isEdited,
     onAction: () => handleDownloadAsset(asset, { edited: false }),
+  };
+
+  const Export: ActionItem = {
+    title: '转码导出',
+    icon: mdiFileExportOutline,
+    $if: () => !!authUser,
+    onAction: () =>
+      modalManager.show(AssetExportModal, { assetId: asset.id, isVideo: asset.type === AssetTypeEnum.Video }),
   };
 
   const SharedLinkDownload: ActionItem = {
@@ -301,6 +311,7 @@ export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto & 
     Share,
     Download,
     DownloadOriginal,
+    Export,
     SharedLinkDownload,
     Offline,
     Info,

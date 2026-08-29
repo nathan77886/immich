@@ -6683,6 +6683,126 @@
         "x-immich-state": "Stable"
       }
     },
+    "/download/exports": {
+      "get": {
+        "operationId": "listExports",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExportResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "tags": [
+          "Download"
+        ]
+      },
+      "post": {
+        "operationId": "createExport",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "tags": [
+          "Download"
+        ],
+        "x-immich-permission": "asset.download"
+      }
+    },
+    "/download/exports/{id}": {
+      "get": {
+        "operationId": "downloadExport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "tags": [
+          "Download"
+        ]
+      }
+    },
     "/download/info": {
       "post": {
         "description": "Retrieve information about how to request a download for the specified assets or album. The response includes groups of assets that can be downloaded together.",
@@ -22228,6 +22348,120 @@
         },
         "type": "object"
       },
+      "ExportCreateDto": {
+        "properties": {
+          "assetId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "mp4-h264",
+              "mp4-hevc",
+              "jpeg",
+              "png",
+              "webp"
+            ],
+            "type": "string"
+          },
+          "quality": {
+            "default": 90,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "resolution": {
+            "enum": [
+              "1080",
+              "1440",
+              "2160",
+              "original"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "format",
+          "resolution"
+        ],
+        "type": "object"
+      },
+      "ExportResponseDto": {
+        "properties": {
+          "assetId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "error": {
+            "nullable": true,
+            "type": "string"
+          },
+          "fileName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "mp4-h264",
+              "mp4-hevc",
+              "jpeg",
+              "png",
+              "webp"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "quality": {
+            "default": 90,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "resolution": {
+            "enum": [
+              "1080",
+              "1440",
+              "2160",
+              "original"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "processing",
+              "ready",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "createdAt",
+          "error",
+          "fileName",
+          "format",
+          "id",
+          "resolution",
+          "status",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
       "FaceDto": {
         "properties": {
           "id": {
@@ -22440,6 +22674,7 @@
       "JobName": {
         "description": "Job name",
         "enum": [
+          "AssetExport",
           "AssetDelete",
           "AssetDeleteCheck",
           "AssetDetectFacesQueueAll",
