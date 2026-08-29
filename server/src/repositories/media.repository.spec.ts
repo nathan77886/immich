@@ -68,6 +68,24 @@ describe(MediaRepository.name, () => {
     sut = new MediaRepository(automock(LoggingRepository, { args: [, { getEnv: () => ({}) }], strict: false }));
   });
 
+  describe('exportImage', () => {
+    it('uses standard 4K bounds without enlarging the source', async () => {
+      using testDir = mkdtempDisposableSync(join(tmpdir(), 'immich-export-'));
+      const output = join(testDir.path, 'output.jpg');
+      const input = await sharp({
+        create: { width: 4000, height: 3000, channels: 3, background: '#ffffff' },
+      })
+        .jpeg()
+        .toBuffer();
+
+      await sut.exportImage(input, output, { format: 'jpeg', resolution: '2160', quality: 90 });
+
+      const metadata = await sharp(output).metadata();
+      expect(metadata.width).toBe(2880);
+      expect(metadata.height).toBe(2160);
+    });
+  });
+
   describe('applyEdits (single actions)', () => {
     it('should apply crop edit correctly', async () => {
       const result = sut['applyEdits'](

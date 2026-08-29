@@ -422,8 +422,13 @@ export class MediaRepository {
         .audioCodec('aac')
         .outputOptions('-crf', String(options.crf), '-movflags', '+faststart', '-pix_fmt', 'yuv420p');
       if (options.resolution !== 'original') {
+        const dimensions = {
+          '1080': { width: 1920, height: 1080 },
+          '1440': { width: 2560, height: 1440 },
+          '2160': { width: 3840, height: 2160 },
+        }[options.resolution];
         command.videoFilters(
-          `scale=${options.resolution}:${options.resolution}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
+          `scale=${dimensions.width}:${dimensions.height}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
         );
       }
       command
@@ -440,8 +445,12 @@ export class MediaRepository {
   ): Promise<void> {
     let pipeline = sharp(input, { failOn: 'error', limitInputPixels: false }).rotate();
     if (options.resolution !== 'original') {
-      const resolution = Number(options.resolution);
-      pipeline = pipeline.resize(resolution, resolution, { fit: 'inside', withoutEnlargement: true });
+      const dimensions = {
+        '1080': { width: 1920, height: 1080 },
+        '1440': { width: 2560, height: 1440 },
+        '2160': { width: 3840, height: 2160 },
+      }[options.resolution];
+      pipeline = pipeline.resize(dimensions.width, dimensions.height, { fit: 'inside', withoutEnlargement: true });
     }
     await pipeline.toFormat(options.format, { quality: options.quality }).toFile(output);
   }

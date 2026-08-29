@@ -15,10 +15,35 @@
   type Props = { assetId: string; isVideo: boolean; onClose: () => void };
   const { assetId, isVideo, onClose }: Props = $props();
   let format = $state(isVideo ? 'mp4-h264' : 'jpeg');
-  let resolution: 'original' | '1080' | '1440' | '2160' = $state('2160');
+  let resolution = $state<'original' | '1080' | '1440' | '2160'>('2160');
   let quality = $state(90);
   let submitting = $state(false);
   let exports = $state<ExportItem[]>([]);
+  const formatNote = $derived(
+    isVideo
+      ? format === 'mp4-hevc'
+        ? 'MP4 容器 + H.265/HEVC。文件通常更小，但旧设备和部分浏览器可能无法播放。'
+        : 'MP4 容器 + H.264/AVC。兼容性最好，适合电脑、手机、电视和浏览器。'
+      : format === 'png'
+        ? '无损图片。适合截图、文字和后期处理，照片文件通常最大。'
+        : format === 'webp'
+          ? '现代高压缩图片。文件通常较小，但旧软件兼容性弱于 JPEG。'
+          : '通用有损图片。照片兼容性最好，不保留 RAW 编辑能力。',
+  );
+  const resolutionNote = $derived(
+    resolution === 'original'
+      ? '保持原始宽高，不主动缩小；仍会按所选格式重新编码。'
+      : resolution === '2160'
+        ? '最长边限制为 3840×2160（4K），小于该尺寸时不会放大。'
+        : resolution === '1440'
+          ? '最长边限制为 2560×1440（2K），小于该尺寸时不会放大。'
+          : '最长边限制为 1920×1080，小于该尺寸时不会放大。',
+  );
+  const qualityNote = $derived(
+    isVideo
+      ? `视频质量 ${quality}/100，对应约 CRF ${Math.max(13, Math.round(31 - quality * 0.18))}。数值越高越清晰、文件越大、转码越慢。`
+      : `图片编码质量 ${quality}/100。数值越高越清晰、文件越大；PNG 为无损格式，此参数影响较小。`,
+  );
 
   const load = async () => {
     const response = await fetch('/api/download/exports');
@@ -64,6 +89,17 @@
             >{/if}</select
         ></label
       >
+      <p class="text-sm text-gray-600 dark:text-gray-300">{formatNote}</p>
+      <ul class="list-disc space-y-1 ps-5 text-xs text-gray-500 dark:text-gray-400">
+        {#if isVideo}
+          <li>MP4 / H.264：兼容性最好，文件通常较大。</li>
+          <li>MP4 / HEVC：压缩率更高，旧设备兼容性较弱。</li>
+        {:else}
+          <li>JPEG：照片兼容性最好，有损压缩，不支持透明。</li>
+          <li>PNG：无损压缩，支持透明，照片文件通常最大。</li>
+          <li>WebP：文件通常较小，支持透明，旧软件兼容性较弱。</li>
+        {/if}
+      </ul>
       <label
         >分辨率<select class="immich-form-input w-full" bind:value={resolution}
           ><option value="original">原尺寸</option><option value="2160">4K</option><option value="1440"
@@ -71,7 +107,19 @@
           ><option value="1080">1080p</option></select
         ></label
       >
-      <label>质量：{quality}<input class="w-full" type="range" min="1" max="100" bind:value={quality} /></label>
+      <p class="text-sm text-gray-600 dark:text-gray-300">{resolutionNote}</p>
+      <ul class="list-disc space-y-1 ps-5 text-xs text-gray-500 dark:text-gray-400">
+        <li>原尺寸：保持原始宽高，只转换格式和编码。</li>
+        <li>4K：最大 3840×2160，适合大屏播放和保存细节。</li>
+        <li>2K / 1440p：最大 2560×1440，清晰度与体积较均衡。</li>
+        <li>1080p：最大 1920×1080，兼容性高、文件较小。</li>
+      </ul>
+      <label>质量：{quality}<input class="w-full" type="range" min="1" max="100" step="1" bind:value={quality} /></label
+      >
+      <p class="text-sm text-gray-600 dark:text-gray-300">{qualityNote}</p>
+      <p class="text-xs text-gray-500 dark:text-gray-400">
+        建议：普通分享 75–85；高质量保存 90–95；100 文件很大，通常看不出明显提升。
+      </p>
       {#if exports.length}<div class="flex flex-col gap-2">
           <h3 class="font-medium">已有任务</h3>
           {#each exports as item (item.id)}<div
