@@ -414,7 +414,11 @@ export class MediaRepository {
   exportVideo(
     input: string,
     output: string,
-    options: { codec: 'h264' | 'hevc'; resolution: 'original' | '1080' | '1440' | '2160'; crf: number },
+    options: {
+      codec: 'h264' | 'hevc';
+      resolution: 'original' | '1080' | '1440' | '2160' | '2880' | '3456' | '4032' | '4320';
+      crf: number;
+    },
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const command = ffmpeg(input)
@@ -426,6 +430,10 @@ export class MediaRepository {
           '1080': { width: 1920, height: 1080 },
           '1440': { width: 2560, height: 1440 },
           '2160': { width: 3840, height: 2160 },
+          '2880': { width: 5120, height: 2880 },
+          '3456': { width: 6144, height: 3456 },
+          '4032': { width: 7168, height: 4032 },
+          '4320': { width: 7680, height: 4320 },
         }[options.resolution];
         command.videoFilters(
           `scale=${dimensions.width}:${dimensions.height}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
@@ -441,7 +449,11 @@ export class MediaRepository {
   async exportImage(
     input: string | Buffer,
     output: string,
-    options: { format: 'jpeg' | 'png' | 'webp'; resolution: 'original' | '1080' | '1440' | '2160'; quality: number },
+    options: {
+      format: 'jpeg' | 'png' | 'webp';
+      resolution: 'original' | '1080' | '1440' | '2160' | '2880' | '3456' | '4032' | '4320';
+      quality: number;
+    },
   ): Promise<void> {
     let pipeline = sharp(input, { failOn: 'error', limitInputPixels: false }).rotate();
     if (options.resolution !== 'original') {
@@ -449,6 +461,10 @@ export class MediaRepository {
         '1080': { width: 1920, height: 1080 },
         '1440': { width: 2560, height: 1440 },
         '2160': { width: 3840, height: 2160 },
+        '2880': { width: 5120, height: 2880 },
+        '3456': { width: 6144, height: 3456 },
+        '4032': { width: 7168, height: 4032 },
+        '4320': { width: 7680, height: 4320 },
       }[options.resolution];
       pipeline = pipeline.resize(dimensions.width, dimensions.height, { fit: 'inside', withoutEnlargement: true });
     }

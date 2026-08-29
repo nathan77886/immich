@@ -8179,6 +8179,10 @@ export enum Resolution {
     $1080 = "1080",
     $1440 = "1440",
     $2160 = "2160",
+    $2880 = "2880",
+    $3456 = "3456",
+    $4032 = "4032",
+    $4320 = "4320",
     Original = "original"
 }
 export enum Status {

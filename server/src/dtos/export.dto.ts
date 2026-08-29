@@ -2,7 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 
 export const ExportFormatSchema = z.enum(['mp4-h264', 'mp4-hevc', 'jpeg', 'png', 'webp']);
-export const ExportResolutionSchema = z.enum(['original', '1080', '1440', '2160']);
+export const ExportResolutionSchema = z.enum(['original', '1080', '1440', '2160', '2880', '3456', '4032', '4320']);
 export const ExportStatusSchema = z.enum(['queued', 'processing', 'ready', 'failed']);
 
 const ExportCreateSchema = z.object({

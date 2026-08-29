@@ -15,7 +15,7 @@
   type Props = { assetId: string; isVideo: boolean; onClose: () => void };
   const { assetId, isVideo, onClose }: Props = $props();
   let format = $state(isVideo ? 'mp4-h264' : 'jpeg');
-  let resolution = $state<'original' | '1080' | '1440' | '2160'>('2160');
+  let resolution = $state<'original' | '1080' | '1440' | '2160' | '2880' | '3456' | '4032' | '4320'>('2160');
   let quality = $state(90);
   let submitting = $state(false);
   let exports = $state<ExportItem[]>([]);
@@ -33,11 +33,19 @@
   const resolutionNote = $derived(
     resolution === 'original'
       ? '保持原始宽高，不主动缩小；仍会按所选格式重新编码。'
-      : resolution === '2160'
-        ? '最长边限制为 3840×2160（4K），小于该尺寸时不会放大。'
-        : resolution === '1440'
-          ? '最长边限制为 2560×1440（2K），小于该尺寸时不会放大。'
-          : '最长边限制为 1920×1080，小于该尺寸时不会放大。',
+      : resolution === '4320'
+        ? '最大 7680×4320（8K），小于该尺寸时不会放大。'
+        : resolution === '4032'
+          ? '最大 7168×4032（7K），小于该尺寸时不会放大。'
+          : resolution === '3456'
+            ? '最大 6144×3456（6K），小于该尺寸时不会放大。'
+            : resolution === '2880'
+              ? '最大 5120×2880（5K），小于该尺寸时不会放大。'
+              : resolution === '2160'
+                ? '最长边限制为 3840×2160（4K），小于该尺寸时不会放大。'
+                : resolution === '1440'
+                  ? '最长边限制为 2560×1440（2K），小于该尺寸时不会放大。'
+                  : '最长边限制为 1920×1080，小于该尺寸时不会放大。',
   );
   const qualityNote = $derived(
     isVideo
@@ -102,14 +110,19 @@
       </ul>
       <label
         >分辨率<select class="immich-form-input w-full" bind:value={resolution}
-          ><option value="original">原尺寸</option><option value="2160">4K</option><option value="1440"
-            >2K / 1440p</option
+          ><option value="original">原尺寸</option><option value="4320">8K</option><option value="4032">7K</option
+          ><option value="3456">6K</option><option value="2880">5K</option><option value="2160">4K</option><option
+            value="1440">2K / 1440p</option
           ><option value="1080">1080p</option></select
         ></label
       >
       <p class="text-sm text-gray-600 dark:text-gray-300">{resolutionNote}</p>
       <ul class="list-disc space-y-1 ps-5 text-xs text-gray-500 dark:text-gray-400">
         <li>原尺寸：保持原始宽高，只转换格式和编码。</li>
+        <li>8K：最大 7680×4320，为更高分辨率素材预留。</li>
+        <li>7K：最大 7168×4032，适合 7K 相机素材。</li>
+        <li>6K：最大 6144×3456，适合常见 6K 素材。</li>
+        <li>5K：最大 5120×2880，兼顾高分辨率和文件体积。</li>
         <li>4K：最大 3840×2160，适合大屏播放和保存细节。</li>
         <li>2K / 1440p：最大 2560×1440，清晰度与体积较均衡。</li>
         <li>1080p：最大 1920×1080，兼容性高、文件较小。</li>

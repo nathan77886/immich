@@ -84,6 +84,22 @@ describe(MediaRepository.name, () => {
       expect(metadata.width).toBe(2880);
       expect(metadata.height).toBe(2160);
     });
+
+    it('keeps 7K exports within 7168x4032', async () => {
+      using testDir = mkdtempDisposableSync(join(tmpdir(), 'immich-export-'));
+      const output = join(testDir.path, 'output.jpg');
+      const input = await sharp({
+        create: { width: 8000, height: 4500, channels: 3, background: '#ffffff' },
+      })
+        .jpeg()
+        .toBuffer();
+
+      await sut.exportImage(input, output, { format: 'jpeg', resolution: '4032', quality: 90 });
+
+      const metadata = await sharp(output).metadata();
+      expect(metadata.width).toBe(7168);
+      expect(metadata.height).toBe(4032);
+    });
   });
 
   describe('applyEdits (single actions)', () => {
