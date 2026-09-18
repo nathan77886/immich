@@ -100,17 +100,15 @@ export class PersonRepository {
   async reassignFaces({ oldPersonGroupId, faceIds, ownerId, newPersonGroupId }: UpdateFacesData): Promise<number> {
     const result = await this.db
       .updateTable('asset_face')
+      .from('asset')
+      .whereRef('asset_face.assetId', '=', 'asset.id')
       .set({ personGroupId: newPersonGroupId })
       .$if(!!oldPersonGroupId, (qb) => qb.where('asset_face.personGroupId', '=', oldPersonGroupId!))
       .$if(!!faceIds, (qb) => qb.where('asset_face.id', 'in', faceIds!))
-      .$if(!!ownerId, (qb) =>
-        qb.where('asset_face.personGroupId', 'in', (eb) =>
-          eb.selectFrom('person').select('person.personGroupId').where('person.ownerId', '=', ownerId!),
-        ),
-      )
+      .$if(!!ownerId, (qb) => qb.where('asset.ownerId', '=', ownerId!))
       .executeTakeFirst();
 
-    return Number(result.numChangedRows ?? 0);
+    return Number(result.numUpdatedRows ?? 0);
   }
 
   @GenerateSql({ params: [{ sourceType: SourceType.MachineLearning, clusterGroupId: DummyValue.UUID }] })
@@ -729,15 +727,6 @@ export class PersonRepository {
     await this.db.updateTable('asset_face').set({ deletedAt: new Date() }).where('asset_face.id', '=', id).execute();
   }
 
-  async vacuum({ reindexVectors }: { reindexVectors: boolean }): Promise<void> {
-    await sql`VACUUM ANALYZE asset_face, face_search, person`.execute(this.db);
-    await sql`REINDEX TABLE asset_face`.execute(this.db);
-    await sql`REINDEX TABLE person`.execute(this.db);
-    if (reindexVectors) {
-      await sql`REINDEX TABLE face_search`.execute(this.db);
-    }
-  }
-
   @GenerateSql({ params: [[], []] })
   async updateVisibility(visible: AssetFace[], hidden: AssetFace[]): Promise<void> {
     if (visible.length === 0 && hidden.length === 0) {
@@ -778,6 +767,7 @@ export class PersonRepository {
       .select('asset_face.id')
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.personGroupId', '=', personGroupId)
+      .where('asset_face.deletedAt', 'is', null)
       .innerJoin('asset', (join) => join.onRef('asset.id', '=', 'asset_face.assetId').on('asset.isOffline', '=', false))
       .executeTakeFirst();
   }
