@@ -9984,6 +9984,65 @@
         "x-immich-state": "Stable"
       }
     },
+    "/people/merge": {
+      "post": {
+        "description": "Merge an ordered list of people together into a single person. The final name and birth date are always the first defined value, following the order. Also automatically merges people for other users in the cluster group, skipping people that would result in overriding a previously set name or birth date.",
+        "operationId": "mergePeople",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergePersonDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BulkIdResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Merge people",
+        "tags": [
+          "People"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.2.1",
+            "state": "Added"
+          },
+          {
+            "version": "v3.2.1",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "person.merge",
+        "x-immich-state": "Stable"
+      }
+    },
     "/people/{id}": {
       "delete": {
         "description": "Delete an individual person.",
@@ -10175,8 +10234,9 @@
     },
     "/people/{id}/merge": {
       "post": {
+        "deprecated": true,
         "description": "Merge a list of people into the person specified in the path parameter.",
-        "operationId": "mergePerson",
+        "operationId": "mergePersonLegacy",
         "parameters": [
           {
             "name": "id",
@@ -10227,7 +10287,8 @@
         ],
         "summary": "Merge people",
         "tags": [
-          "People"
+          "People",
+          "Deprecated"
         ],
         "x-immich-history": [
           {
@@ -10241,10 +10302,15 @@
           {
             "version": "v2",
             "state": "Stable"
+          },
+          {
+            "version": "v3.2.1",
+            "state": "Deprecated",
+            "replacementId": "mergePeople"
           }
         ],
         "x-immich-permission": "person.merge",
-        "x-immich-state": "Stable"
+        "x-immich-state": "Deprecated"
       }
     },
     "/people/{id}/reassign": {
@@ -17895,7 +17961,7 @@
   "info": {
     "title": "Immich",
     "description": "Immich API",
-    "version": "3.2.0-rc.0",
+    "version": "3.2.2",
     "contact": {}
   },
   "tags": [
@@ -19482,7 +19548,7 @@
             ]
           },
           "endDate": {
-            "description": "End date (latest asset)",
+            "description": "UTC representation of (local) end date (latest asset)",
             "format": "date-time",
             "type": "string"
           },
@@ -19513,7 +19579,7 @@
             "type": "boolean"
           },
           "startDate": {
-            "description": "Start date (earliest asset)",
+            "description": "UTC representation of (local) start date (earliest asset)",
             "format": "date-time",
             "type": "string"
           },
@@ -19889,12 +19955,14 @@
           },
           "latitude": {
             "description": "Latitude coordinate",
+            "format": "double",
             "maximum": 90,
             "minimum": -90,
             "type": "number"
           },
           "longitude": {
             "description": "Longitude coordinate",
+            "format": "double",
             "maximum": 180,
             "minimum": -180,
             "type": "number"
@@ -22131,6 +22199,7 @@
           "fNumber": {
             "default": null,
             "description": "F-number (aperture)",
+            "format": "double",
             "nullable": true,
             "type": "number"
           },
@@ -22145,6 +22214,7 @@
           "focalLength": {
             "default": null,
             "description": "Focal length in mm",
+            "format": "double",
             "nullable": true,
             "type": "number"
           },
@@ -22159,6 +22229,7 @@
           "latitude": {
             "default": null,
             "description": "GPS latitude",
+            "format": "double",
             "nullable": true,
             "type": "number"
           },
@@ -22171,6 +22242,7 @@
           "longitude": {
             "default": null,
             "description": "GPS longitude",
+            "format": "double",
             "nullable": true,
             "type": "number"
           },
@@ -24287,32 +24359,40 @@
       "NumberFilter": {
         "properties": {
           "eq": {
+            "format": "double",
             "type": "number"
           },
           "gt": {
+            "format": "double",
             "type": "number"
           },
           "gte": {
+            "format": "double",
             "type": "number"
           },
           "in": {
             "items": {
+              "format": "double",
               "type": "number"
             },
             "minItems": 1,
             "type": "array"
           },
           "lt": {
+            "format": "double",
             "type": "number"
           },
           "lte": {
+            "format": "double",
             "type": "number"
           },
           "ne": {
+            "format": "double",
             "type": "number"
           },
           "notIn": {
             "items": {
+              "format": "double",
               "type": "number"
             },
             "minItems": 1,
@@ -24324,34 +24404,42 @@
       "NumberFilterNullable": {
         "properties": {
           "eq": {
+            "format": "double",
             "nullable": true,
             "type": "number"
           },
           "gt": {
+            "format": "double",
             "type": "number"
           },
           "gte": {
+            "format": "double",
             "type": "number"
           },
           "in": {
             "items": {
+              "format": "double",
               "type": "number"
             },
             "minItems": 1,
             "type": "array"
           },
           "lt": {
+            "format": "double",
             "type": "number"
           },
           "lte": {
+            "format": "double",
             "type": "number"
           },
           "ne": {
+            "format": "double",
             "nullable": true,
             "type": "number"
           },
           "notIn": {
             "items": {
+              "format": "double",
               "type": "number"
             },
             "minItems": 1,
@@ -25096,10 +25184,12 @@
           },
           "latitude": {
             "description": "Latitude coordinate",
+            "format": "double",
             "type": "number"
           },
           "longitude": {
             "description": "Longitude coordinate",
+            "format": "double",
             "type": "number"
           },
           "name": {
@@ -26489,7 +26579,9 @@
         "properties": {
           "angle": {
             "description": "Rotation angle in degrees",
-            "type": "number"
+            "maximum": 270,
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -31554,6 +31646,7 @@
           "latitude": {
             "description": "Array of latitude coordinates extracted from EXIF GPS data",
             "items": {
+              "format": "double",
               "nullable": true,
               "type": "number"
             },
@@ -31570,6 +31663,7 @@
           "localOffsetHours": {
             "description": "Array of UTC offset hours at the time each photo was taken. Positive values are east of UTC, negative values are west of UTC. Values may be fractional (e.g., 5.5 for +05:30, -9.75 for -09:45). Applying this offset to 'fileCreatedAt' will give you the time the photo was taken from the photographer's perspective.",
             "items": {
+              "format": "double",
               "type": "number"
             },
             "type": "array"
@@ -31577,6 +31671,7 @@
           "longitude": {
             "description": "Array of longitude coordinates extracted from EXIF GPS data",
             "items": {
+              "format": "double",
               "nullable": true,
               "type": "number"
             },
@@ -31600,6 +31695,7 @@
           "ratio": {
             "description": "Array of aspect ratios (width/height) for each asset",
             "items": {
+              "format": "double",
               "type": "number"
             },
             "type": "array"
@@ -31783,6 +31879,7 @@
           },
           "latitude": {
             "description": "Latitude coordinate",
+            "format": "double",
             "maximum": 90,
             "minimum": -90,
             "type": "number"
@@ -31796,6 +31893,7 @@
           },
           "longitude": {
             "description": "Longitude coordinate",
+            "format": "double",
             "maximum": 180,
             "minimum": -180,
             "type": "number"
