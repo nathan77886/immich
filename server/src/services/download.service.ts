@@ -18,7 +18,7 @@ import { ImmichReadStream } from 'src/repositories/storage.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobOf } from 'src/types.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
-import { getFileNameWithoutExtension, getFilenameExtension, ImmichFileResponse } from 'src/utils/file.js';
+import { ImmichFileResponse, getFileNameWithoutExtension, getFilenameExtension } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { getPreferences } from 'src/utils/preferences.js';
 
