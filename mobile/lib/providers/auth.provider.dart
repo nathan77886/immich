@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_udid/flutter_udid.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
+import 'package:immich_mobile/data/store/passkey.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
@@ -86,6 +87,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return response;
   }
 
+  Future<LoginResponse?> passkeyLogin() async {
+    final response = await _ref.read(PasskeyStore.instance).login();
+    if (response != null) {
+      await saveAuthInfo(accessToken: response.accessToken);
+    }
+
+    return response;
+  }
+
   Future<void> logout() async {
     try {
       await _secureStorageService.delete(kSecuredPinCode);
@@ -115,9 +125,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(profileImagePath: path);
   }
 
-  Future<bool> changePassword(String newPassword) async {
+  Future<bool> changePassword({required String currentPassword, required String newPassword}) async {
     try {
-      await _authService.changePassword(newPassword);
+      await _authService.changePassword(currentPassword: currentPassword, newPassword: newPassword);
       return true;
     } catch (_) {
       return false;

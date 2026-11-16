@@ -1,9 +1,16 @@
 import { WorkflowTrigger } from '@immich/plugin-sdk';
 import z from 'zod';
+import { asIntegerEnum } from 'src/utils/helpers.js';
 
 export enum AuthType {
   Password = 'password',
   OAuth = 'oauth',
+  Passkey = 'passkey',
+}
+
+export enum AuthChallengeType {
+  PasskeyRegistration = 'PasskeyRegistration',
+  PasskeyAuthentication = 'PasskeyAuthentication',
 }
 
 export enum ImmichCookie {
@@ -52,9 +59,7 @@ export enum ChecksumAlgorithm {
 }
 
 export enum AssetFileType {
-  /**
-   * An full/large-size image extracted/converted from RAW photos
-   */
+  /** An full/large-size image extracted/converted from RAW photos */
   FullSize = 'fullsize',
   Preview = 'preview',
   Thumbnail = 'thumbnail',
@@ -89,9 +94,28 @@ export const AssetOrderBySchema = z.enum(AssetOrderBy).describe('Asset sorting p
 export enum MemoryType {
   /** pictures taken on this day X years ago */
   OnThisDay = 'on_this_day',
+
+  /** pictures of a person, shown leading up to their birthday */
+  Birthday = 'birthday',
 }
 
 export const MemoryTypeSchema = z.enum(MemoryType).describe('Memory type').meta({ id: 'MemoryType' });
+
+export enum SharingDirection {
+  SharedBy = 'shared-by',
+  SharedWith = 'shared-with',
+}
+
+export const SharingDirectionSchema = z
+  .enum(SharingDirection)
+  .describe('Sharing direction')
+  .meta({ id: 'SharingDirection' });
+
+// TODO(v4) replace with SharingDirection
+export const PartnerDirectionSchema = z
+  .enum(SharingDirection)
+  .describe('Partner direction')
+  .meta({ id: 'PartnerDirection' });
 
 export enum AssetOrderWithRandom {
   // Include existing values
@@ -169,6 +193,7 @@ export enum Permission {
 
   ClusterGroupRead = 'clusterGroup.read',
   ClusterGroupLeave = 'clusterGroup.leave',
+  ClusterGroupAdmin = 'clusterGroup.admin',
   ClusterGroupRequestCreate = 'clusterGroupRequest.create',
   ClusterGroupRequestRead = 'clusterGroupRequest.read',
   ClusterGroupRequestDelete = 'clusterGroupRequest.delete',
@@ -223,6 +248,10 @@ export enum Permission {
   PartnerRead = 'partner.read',
   PartnerUpdate = 'partner.update',
   PartnerDelete = 'partner.delete',
+
+  PasskeyRead = 'passkey.read',
+  PasskeyUpdate = 'passkey.update',
+  PasskeyDelete = 'passkey.delete',
 
   PersonCreate = 'person.create',
   PersonRead = 'person.read',
@@ -332,9 +361,9 @@ export enum SharedLinkType {
   Album = 'ALBUM',
 
   /**
-   * Individual asset
-   * or group of assets that are not in an album
-   */
+  Individual asset
+  or group of assets that are not in an album
+  */
   Individual = 'INDIVIDUAL',
 }
 
@@ -397,6 +426,16 @@ export const UserAvatarColorSchema = z
   .enum(UserAvatarColor)
   .describe('User avatar color')
   .meta({ id: 'UserAvatarColor' });
+
+export enum PersonUpdateStrategy {
+  Self = 'self',
+  Everyone = 'everyone',
+}
+
+export const PersonUpdateStrategySchema = z
+  .enum(PersonUpdateStrategy)
+  .describe('Which person records to update when editing a person')
+  .meta({ id: 'PersonUpdateStrategy' });
 
 export enum UserStatus {
   Active = 'active',
@@ -570,6 +609,7 @@ export const ColorspaceSchema = z.enum(Colorspace).describe('Colorspace').meta({
 
 export enum ImageFormat {
   Jpeg = 'jpeg',
+  Jxl = 'jxl',
   Webp = 'webp',
 }
 
@@ -777,9 +817,9 @@ export enum DvProfile {
 }
 
 /**
- * Dolby Vision base-layer signal-compatibility ID from the DOVI configuration record.
- * Identifies what the base HEVC/AVC layer renders as on a non-DV decoder.
- */
+Dolby Vision base-layer signal-compatibility ID from the DOVI configuration record.
+Identifies what the base HEVC/AVC layer renders as on a non-DV decoder.
+*/
 export enum DvSignalCompatibility {
   None = 0,
   Hdr10 = 1,
@@ -839,6 +879,7 @@ export enum QueueJobStatus {
   Complete = 'completed',
   Delayed = 'delayed',
   Waiting = 'waiting',
+  /** @deprecated use `waiting` instead */
   Paused = 'paused',
 }
 
@@ -863,6 +904,8 @@ export enum JobName {
   AssetGenerateThumbnails = 'AssetGenerateThumbnails',
 
   AuditTableCleanup = 'AuditTableCleanup',
+
+  AuthChallengeCleanup = 'AuthChallengeCleanup',
 
   DatabaseBackup = 'DatabaseBackup',
 
@@ -990,6 +1033,8 @@ export enum DatabaseLock {
   IntegrityCheck = 67,
   VersionCheck = 800,
   HlsSessionCleanup = 850,
+  FacialRecognition = 900,
+  DuplicateDetection = 1000,
 }
 
 export enum MaintenanceAction {
@@ -997,6 +1042,7 @@ export enum MaintenanceAction {
   End = 'end',
   SelectDatabaseRestore = 'select_database_restore',
   RestoreDatabase = 'restore_database',
+  Rollback = 'rollback',
 }
 
 export const MaintenanceActionSchema = z
@@ -1025,8 +1071,11 @@ export enum SyncRequestType {
   AssetMetadataV1 = 'AssetMetadataV1',
   AssetOcrV1 = 'AssetOcrV1',
   AuthUsersV1 = 'AuthUsersV1',
+  AuthUsersV2 = 'AuthUsersV2',
   MemoriesV1 = 'MemoriesV1',
+  MemoriesV2 = 'MemoriesV2',
   MemoryToAssetsV1 = 'MemoryToAssetsV1',
+  MemoryToAssetsV2 = 'MemoryToAssetsV2',
   PartnersV1 = 'PartnersV1',
   /** @deprecated */
   PartnerAssetsV1 = 'PartnerAssetsV1',
@@ -1038,7 +1087,9 @@ export enum SyncRequestType {
   PeopleV1 = 'PeopleV1',
   /** @deprecated */
   AssetFacesV1 = 'AssetFacesV1',
+  /** @deprecated */
   AssetFacesV2 = 'AssetFacesV2',
+  AssetFacesV3 = 'AssetFacesV3',
   UserMetadataV1 = 'UserMetadataV1',
 }
 
@@ -1049,6 +1100,7 @@ export const SyncRequestTypeSchema = z
 
 export enum SyncEntityType {
   AuthUserV1 = 'AuthUserV1',
+  AuthUserV2 = 'AuthUserV2',
 
   UserV1 = 'UserV1',
   UserDeleteV1 = 'UserDeleteV1',
@@ -1107,9 +1159,11 @@ export enum SyncEntityType {
   AlbumToAssetBackfillV1 = 'AlbumToAssetBackfillV1',
 
   MemoryV1 = 'MemoryV1',
+  MemoryV2 = 'MemoryV2',
   MemoryDeleteV1 = 'MemoryDeleteV1',
 
   MemoryToAssetV1 = 'MemoryToAssetV1',
+  MemoryToAssetV2 = 'MemoryToAssetV2',
   MemoryToAssetDeleteV1 = 'MemoryToAssetDeleteV1',
 
   StackV1 = 'StackV1',
@@ -1118,8 +1172,11 @@ export enum SyncEntityType {
   PersonV1 = 'PersonV1',
   PersonDeleteV1 = 'PersonDeleteV1',
 
+  /** @deprecated */
   AssetFaceV1 = 'AssetFaceV1',
+  /** @deprecated */
   AssetFaceV2 = 'AssetFaceV2',
+  AssetFaceV3 = 'AssetFaceV3',
   AssetFaceDeleteV1 = 'AssetFaceDeleteV1',
 
   UserMetadataV1 = 'UserMetadataV1',
@@ -1173,9 +1230,7 @@ export enum AssetVisibility {
   Archive = 'archive',
   Timeline = 'timeline',
 
-  /**
-   * Video part of the LivePhotos and MotionPhotos
-   */
+  /** Video part of the LivePhotos and MotionPhotos */
   Hidden = 'hidden',
   Locked = 'locked',
 }
@@ -1230,6 +1285,7 @@ export enum ApiTag {
   NotificationsAdmin = 'Notifications (admin)',
   ClusterGroups = 'Cluster groups',
   Partners = 'Partners',
+  Passkeys = 'Passkeys',
   People = 'People',
   Plugins = 'Plugins',
   Queues = 'Queues',
@@ -1286,3 +1342,16 @@ export enum SearchOrderField {
 }
 
 export const SearchOrderFieldSchema = z.enum(SearchOrderField).meta({ id: 'SearchOrderField' });
+
+export enum ServerFeatureLevel {
+  FeatureLevel = 1,
+  Passkeys = 2,
+}
+
+export const ServerFeatureLevelSchema = z
+  .enum(ServerFeatureLevel)
+  .describe('Server feature level')
+  .meta({
+    id: 'ServerFeatureLevel',
+    ...asIntegerEnum(ServerFeatureLevel),
+  });

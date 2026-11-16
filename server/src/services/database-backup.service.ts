@@ -1,36 +1,36 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
-import { debounce } from 'lodash';
+import { debounce } from 'lodash-es';
 import { DateTime } from 'luxon';
 import path, { basename } from 'node:path';
 import { Duplex, PassThrough, Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import semver from 'semver';
-import { serverVersion } from 'src/constants';
-import { StorageCore } from 'src/cores/storage.core';
-import { OnEvent, OnJob } from 'src/decorators';
-import { DatabaseBackupListResponseDto } from 'src/dtos/database-backup.dto';
-import { CacheControl, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, StorageFolder } from 'src/enum';
-import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { CronRepository } from 'src/repositories/cron.repository';
-import { DatabaseRepository } from 'src/repositories/database.repository';
-import { ArgOf } from 'src/repositories/event.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { ProcessRepository } from 'src/repositories/process.repository';
-import { StorageRepository } from 'src/repositories/storage.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
-import { UserRepository } from 'src/repositories/user.repository';
-import { getConfig } from 'src/utils/config';
+import { coerce, satisfies } from 'semver';
+import { serverVersion } from 'src/constants.js';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
+import { DatabaseBackupListResponseDto } from 'src/dtos/database-backup.dto.js';
+import { CacheControl, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, StorageFolder } from 'src/enum.js';
+import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { CronRepository } from 'src/repositories/cron.repository.js';
+import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { ProcessRepository } from 'src/repositories/process.repository.js';
+import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { UserRepository } from 'src/repositories/user.repository.js';
+import { getConfig } from 'src/utils/config.js';
 import {
+  UnsupportedPostgresError,
   findDatabaseBackupVersion,
   isFailedDatabaseBackupName,
   isValidDatabaseBackupName,
   isValidDatabaseRoutineBackupName,
-  UnsupportedPostgresError,
-} from 'src/utils/database-backups';
-import { ImmichFileResponse } from 'src/utils/file';
-import { handlePromiseError } from 'src/utils/misc';
+} from 'src/utils/database-backups.js';
+import { ImmichFileResponse } from 'src/utils/file.js';
+import { handlePromiseError } from 'src/utils/misc.js';
 
 @Injectable()
 export class DatabaseBackupService {
@@ -124,7 +124,7 @@ export class DatabaseBackupService {
     const isUrlConnection = databaseConfig.connectionType === 'url';
 
     const databaseVersion = await this.databaseRepository.getPostgresVersion();
-    const databaseSemver = semver.coerce(databaseVersion);
+    const databaseSemver = coerce(databaseVersion);
     const databaseMajorVersion = databaseSemver?.major;
 
     const args: string[] = [];
@@ -209,7 +209,7 @@ export class DatabaseBackupService {
       }
     }
 
-    if (!databaseMajorVersion || !databaseSemver || !semver.satisfies(databaseSemver, '>=14.0.0 <19.0.0')) {
+    if (!databaseMajorVersion || !databaseSemver || !satisfies(databaseSemver, '>=14.0.0 <19.0.0')) {
       this.logger.error(`Database Restore Failure: Unsupported PostgreSQL version: ${databaseVersion}`);
       throw new UnsupportedPostgresError(databaseVersion);
     }
@@ -224,7 +224,7 @@ export class DatabaseBackupService {
     };
   }
 
-  async createDatabaseBackup(filenamePrefix: string = ''): Promise<string> {
+  async createDatabaseBackup(filenamePrefix: string = '', signal?: AbortSignal): Promise<string> {
     this.logger.debug(`Database Backup Started`);
 
     const { bin, args, databasePassword, databaseVersion, databaseMajorVersion } =
@@ -235,6 +235,8 @@ export class DatabaseBackupService {
     const filename = `${filenamePrefix}immich-db-backup-${DateTime.now().toFormat("yyyyLLdd'T'HHmmss")}-v${serverVersion.toString()}-pg${databaseVersion.split(' ', 1)[0]}.sql.gz`;
     const backupFilePath = path.join(StorageCore.getBaseFolder(StorageFolder.Backups), filename);
     const temporaryFilePath = `${backupFilePath}.tmp`;
+
+    const compression = await this.getCompressionCommand();
 
     let pgdump: Duplex | undefined;
     let gzip: Duplex | undefined;
@@ -247,10 +249,10 @@ export class DatabaseBackupService {
         },
       });
 
-      gzip = this.processRepository.spawnDuplexStream('gzip', ['--rsyncable']);
+      gzip = this.processRepository.spawnDuplexStream(compression.command, compression.args);
       const fileStream = this.storageRepository.createWriteStream(temporaryFilePath);
 
-      await pipeline(pgdump, gzip, fileStream);
+      await pipeline(pgdump, gzip, fileStream, { signal });
       await this.storageRepository.rename(temporaryFilePath, backupFilePath);
     } catch (error) {
       this.logger.error(`Database Backup Failure: ${error}`);
@@ -265,6 +267,15 @@ export class DatabaseBackupService {
 
     this.logger.log(`Database Backup Success`);
     return backupFilePath;
+  }
+
+  private async getCompressionCommand() {
+    if (await this.processRepository.isCommandAvailable('pigz')) {
+      const processes = Math.min(Math.max(Math.floor(this.processRepository.availableParallelism() * 0.75), 1), 32);
+      return { command: 'pigz', args: ['--rsyncable', '--processes', processes.toString()] };
+    }
+
+    return { command: 'gzip', args: ['--rsyncable'] };
   }
 
   async uploadBackup(file: Express.Multer.File): Promise<void> {
@@ -375,7 +386,7 @@ export class DatabaseBackupService {
 
       let isPgClusterDump = false;
       const version = findDatabaseBackupVersion(filename);
-      if (version && semver.satisfies(version, '<= 2.4')) {
+      if (version && satisfies(version, '<= 2.4')) {
         isPgClusterDump = true;
       }
 

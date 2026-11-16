@@ -1,21 +1,26 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
-import { basename, dirname, extname, join, parse } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
 import sanitize from 'sanitize-filename';
-import { StorageCore } from 'src/cores/storage.core';
-import { OnJob } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { DownloadArchiveDto, DownloadArchiveInfo, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto';
-import { ExportCreateDto, ExportResponseDto } from 'src/dtos/export.dto';
-import { AssetType, CacheControl, JobName, JobStatus, Permission, QueueName, StorageFolder } from 'src/enum';
-import { ImmichReadStream } from 'src/repositories/storage.repository';
-import { BaseService } from 'src/services/base.service';
-import { JobOf } from 'src/types';
-import { HumanReadableSize } from 'src/utils/bytes';
-import { ImmichFileResponse } from 'src/utils/file';
-import { mimeTypes } from 'src/utils/mime-types';
-import { getPreferences } from 'src/utils/preferences';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { OnJob } from 'src/decorators.js';
+import { AuthDto, isEditedOnly } from 'src/dtos/auth.dto.js';
+import {
+  DownloadArchiveDto,
+  DownloadArchiveInfo,
+  DownloadInfoDto,
+  DownloadResponseDto,
+} from 'src/dtos/download.dto.js';
+import { ExportCreateDto, ExportResponseDto } from 'src/dtos/export.dto.js';
+import { AssetType, CacheControl, JobName, JobStatus, Permission, QueueName, StorageFolder } from 'src/enum.js';
+import { ImmichReadStream } from 'src/repositories/storage.repository.js';
+import { BaseService } from 'src/services/base.service.js';
+import type { JobOf } from 'src/types.js';
+import { HumanReadableSize } from 'src/utils/bytes.js';
+import { getFileNameWithoutExtension, getFilenameExtension, ImmichFileResponse } from 'src/utils/file.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
+import { getPreferences } from 'src/utils/preferences.js';
 
 @Injectable()
 export class DownloadService extends BaseService {
@@ -26,12 +31,15 @@ export class DownloadService extends BaseService {
     }
     return segment;
   }
+
   private exportRoot(userId: string) {
     return join(StorageCore.getFolderLocation(StorageFolder.EncodedVideo, this.exportPathSegment(userId)), 'exports');
   }
+
   private exportManifest(userId: string, id: string) {
     return join(this.exportRoot(userId), `${this.exportPathSegment(id)}.json`);
   }
+
   private async readExport(userId: string, id: string): Promise<ExportResponseDto & { outputPath: string | null }> {
     try {
       return JSON.parse(await fs.readFile(this.exportManifest(userId, id), 'utf8'));
@@ -39,6 +47,7 @@ export class DownloadService extends BaseService {
       throw new BadRequestException('Export not found');
     }
   }
+
   private async writeExport(userId: string, item: ExportResponseDto & { outputPath: string | null }) {
     const path = this.exportManifest(userId, item.id);
     this.storageRepository.mkdirSync(dirname(path));
@@ -46,6 +55,7 @@ export class DownloadService extends BaseService {
     await fs.writeFile(temporaryPath, JSON.stringify(item));
     await fs.rename(temporaryPath, path);
   }
+
   async createExport(auth: AuthDto, dto: ExportCreateDto): Promise<ExportResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetDownload, ids: [dto.assetId] });
     const asset = await this.assetRepository.getById(dto.assetId);
@@ -70,6 +80,7 @@ export class DownloadService extends BaseService {
     await this.jobRepository.queue({ name: JobName.AssetExport, data: { exportId: item.id, userId: auth.user.id } });
     return item;
   }
+
   async listExports(auth: AuthDto): Promise<ExportResponseDto[]> {
     // ponytail: per-export manifests support single shared media storage; migrate to DB when server-side filtering or retention automation is needed.
     try {
@@ -84,6 +95,7 @@ export class DownloadService extends BaseService {
       throw error;
     }
   }
+
   async downloadExport(auth: AuthDto, id: string) {
     const item = await this.readExport(auth.user.id, id);
     if (item.status !== 'ready' || !item.outputPath || !item.fileName) {
@@ -146,6 +158,7 @@ export class DownloadService extends BaseService {
       await this.writeExport(userId, item);
     }
   }
+
   async getDownloadInfo(auth: AuthDto, dto: DownloadInfoDto): Promise<DownloadResponseDto> {
     let assets;
 
@@ -176,10 +189,12 @@ export class DownloadService extends BaseService {
       archive.assetIds.push(id);
       archive.size += Number(size || 0);
 
-      if (archive.size > targetSize) {
-        archives.push(archive);
-        archive = { size: 0, assetIds: [] };
+      if (archive.size <= targetSize) {
+        return;
       }
+
+      archives.push(archive);
+      archive = { size: 0, assetIds: [] };
     };
 
     for await (const asset of assets) {
@@ -217,8 +232,9 @@ export class DownloadService extends BaseService {
   async downloadArchive(auth: AuthDto, dto: DownloadArchiveDto): Promise<ImmichReadStream> {
     await this.requireAccess({ auth, permission: Permission.AssetDownload, ids: dto.assetIds });
 
+    const edited = isEditedOnly(auth, dto.edited);
     const zip = this.storageRepository.createZipStream();
-    const assets = await this.assetRepository.getForOriginals(dto.assetIds, dto.edited ?? false);
+    const assets = await this.assetRepository.getForOriginals(dto.assetIds, edited);
     const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
     const paths: Record<string, number> = {};
 
@@ -230,20 +246,22 @@ export class DownloadService extends BaseService {
 
       const { originalPath, editedPath, originalFileName } = asset;
 
-      let filename = sanitize(originalFileName) || 'unnamed';
+      const name = getFileNameWithoutExtension(sanitize(originalFileName) || 'unnamed');
+      const extension = getFilenameExtension(editedPath || originalPath);
+      let filename = name + extension;
+
       const count = paths[filename] || 0;
       paths[filename] = count + 1;
       if (count !== 0) {
-        const parsedFilename = parse(filename);
-        filename = `${parsedFilename.name}+${count}${parsedFilename.ext}`;
+        filename = `${name}+${count}${extension}`;
       }
 
-      let realpath = dto.edited && editedPath ? editedPath : originalPath;
+      let realpath = editedPath || originalPath;
 
       try {
         realpath = await this.storageRepository.realpath(realpath);
       } catch {
-        this.logger.warn('Unable to resolve realpath', { originalPath });
+        this.logger.warn('Unable to resolve realpath', { realpath });
       }
 
       zip.addFile(realpath, filename);

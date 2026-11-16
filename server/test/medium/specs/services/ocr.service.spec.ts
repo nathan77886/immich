@@ -1,25 +1,27 @@
 import { Kysely } from 'kysely';
-import { AssetFileType, JobStatus } from 'src/enum';
-import { AssetJobRepository } from 'src/repositories/asset-job.repository';
-import { AssetRepository } from 'src/repositories/asset.repository';
-import { ConfigRepository } from 'src/repositories/config.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
-import { OcrRepository } from 'src/repositories/ocr.repository';
-import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
-import { DB } from 'src/schema';
-import { OcrService } from 'src/services/ocr.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { AssetFileType, JobStatus } from 'src/enum.js';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
+import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { EventRepository } from 'src/repositories/event.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
+import { OcrRepository } from 'src/repositories/ocr.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { DB } from 'src/schema/index.js';
+import { OcrService } from 'src/services/ocr.service.js';
+import { newMediumService } from 'test/medium.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = (db?: Kysely<DB>) => {
   return newMediumService(OcrService, {
     database: db || defaultDatabase,
     real: [AssetRepository, AssetJobRepository, ConfigRepository, OcrRepository, SystemMetadataRepository],
-    mock: [JobRepository, LoggingRepository, MachineLearningRepository],
+    mock: [EventRepository, JobRepository, LoggingRepository, MachineLearningRepository],
   });
 };
 
@@ -38,6 +40,7 @@ describe(OcrService.name, () => {
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview.jpg' });
+    ctx.getMock(EventRepository).emit.mockResolvedValue();
 
     const machineLearningMock = ctx.getMock(MachineLearningRepository);
     machineLearningMock.ocr.mockResolvedValue({
@@ -90,6 +93,7 @@ describe(OcrService.name, () => {
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview.jpg' });
+    ctx.getMock(EventRepository).emit.mockResolvedValue();
 
     const machineLearningMock = ctx.getMock(MachineLearningRepository);
     machineLearningMock.ocr.mockResolvedValue({
@@ -214,6 +218,7 @@ describe(OcrService.name, () => {
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview.jpg' });
+    ctx.getMock(EventRepository).emit.mockResolvedValue();
 
     const machineLearningMock = ctx.getMock(MachineLearningRepository);
     machineLearningMock.ocr.mockResolvedValue({ box: [], boxScore: [], text: [], textScore: [] });
@@ -239,6 +244,7 @@ describe(OcrService.name, () => {
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: 'preview.jpg' });
+    ctx.getMock(EventRepository).emit.mockResolvedValue();
 
     const machineLearningMock = ctx.getMock(MachineLearningRepository);
     machineLearningMock.ocr.mockResolvedValue({

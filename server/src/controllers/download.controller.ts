@@ -1,16 +1,16 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Next, Param, Post, Res, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { NextFunction, Response } from 'express';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { DownloadArchiveDto, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto';
-import { ExportCreateDto, ExportResponseDto } from 'src/dtos/export.dto';
-import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DownloadService } from 'src/services/download.service';
-import { asStreamableFile, sendFile } from 'src/utils/file';
-import { UUIDParamDto } from 'src/validation';
+import type { NextFunction, Response } from 'express';
+import { Endpoint, HistoryBuilder } from 'src/decorators.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { DownloadArchiveDto, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto.js';
+import { ExportCreateDto, ExportResponseDto } from 'src/dtos/export.dto.js';
+import { ApiTag, Permission } from 'src/enum.js';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
+import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { DownloadService } from 'src/services/download.service.js';
+import { asStreamableFile, sendFile } from 'src/utils/file.js';
+import { UUIDParamDto } from 'src/validation.js';
 
 @ApiTags(ApiTag.Download)
 @Controller('download')
@@ -45,6 +45,7 @@ export class DownloadController {
   downloadArchive(@Auth() auth: AuthDto, @Body() dto: DownloadArchiveDto): Promise<StreamableFile> {
     return this.service.downloadArchive(auth, dto).then(asStreamableFile);
   }
+
   @Post('exports')
   @Authenticated({ permission: Permission.AssetDownload })
   createExport(@Auth() auth: AuthDto, @Body() dto: ExportCreateDto): Promise<ExportResponseDto> {

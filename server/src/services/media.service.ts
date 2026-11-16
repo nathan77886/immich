@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { FACE_THUMBNAIL_SIZE } from 'src/constants';
-import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core';
-import { AssetFile } from 'src/database';
-import { OnEvent, OnJob } from 'src/decorators';
-import { ConfigFFmpegDto, SystemConfig } from 'src/dtos/config.dto';
-import { AssetEditAction, CropParameters } from 'src/dtos/editing.dto';
+import { FACE_THUMBNAIL_SIZE, THUMBNAIL_DECODING_TIER } from 'src/constants.js';
+import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core.js';
+import { AssetFile } from 'src/database.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
+import { ConfigFFmpegDto, SystemConfig } from 'src/dtos/config.dto.js';
+import { AssetEditAction, CropParameters } from 'src/dtos/editing.dto.js';
 import {
   AssetFileType,
   AssetType,
@@ -23,11 +23,11 @@ import {
   TranscodeTarget,
   VideoCodec,
   VideoContainer,
-} from 'src/enum';
-import { AssetJobRepository } from 'src/repositories/asset-job.repository';
-import { BoundingBox } from 'src/repositories/machine-learning.repository';
-import { BaseService } from 'src/services/base.service';
-import {
+} from 'src/enum.js';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
+import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
+import { BaseService } from 'src/services/base.service.js';
+import type {
   AudioStreamInfo,
   DecodeToBufferOptions,
   GenerateThumbnailOptions,
@@ -37,13 +37,14 @@ import {
   VideoFormat,
   VideoInterfaces,
   VideoStreamInfo,
-} from 'src/types';
-import { getAssetFile, getDimensions } from 'src/utils/asset.util';
-import { checkFaceVisibility, checkOcrVisibility } from 'src/utils/editor';
-import { BaseConfig, ThumbnailConfig } from 'src/utils/media';
-import { mimeTypes } from 'src/utils/mime-types';
-import { batched, clamp } from 'src/utils/misc';
-import { getOutputDimensions } from 'src/utils/transform';
+} from 'src/types.js';
+import { getAssetFile, getDimensions } from 'src/utils/asset.util.js';
+import { tokenizeForSearch } from 'src/utils/database.js';
+import { checkFaceVisibility, checkOcrVisibility } from 'src/utils/editor.js';
+import { BaseConfig, ThumbnailConfig } from 'src/utils/media.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
+import { batched, clamp } from 'src/utils/misc.js';
+import { getOutputDimensions } from 'src/utils/transform.js';
 
 interface UpsertFileOptions {
   assetId: string;
@@ -169,15 +170,12 @@ export class MediaService extends BaseService {
 
     let thumbhash: Buffer | undefined = generated?.thumbhash;
     if (!thumbhash) {
-      const extractedImage = await this.extractOriginalImage(asset, config.image);
-      const { info, data, colorspace } = extractedImage;
+      const { info, data, colorspace } = await this.extractOriginalImage(asset, config.image);
 
-      thumbhash = await this.mediaRepository.generateThumbhash(data, {
-        colorspace,
-        processInvalidImages: false,
-        raw: info,
-        edits: [],
-      });
+      thumbhash = await this.mediaRepository.generateThumbhash(
+        { data, info },
+        { colorspace, processInvalidImages: false, edits: [] },
+      );
     }
 
     if (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbhash) !== 0) {
@@ -292,8 +290,8 @@ export class MediaService extends BaseService {
 
   private async generateImageThumbnails(asset: ThumbnailAsset, { image }: SystemConfig, useEdits: boolean = false) {
     // Handle embedded preview extraction for RAW files
-    const extractedImage = await this.extractOriginalImage(asset, image, useEdits);
-    const { info, data, colorspace, generateFullsize, convertFullsize, extracted, isTransparent } = extractedImage;
+    const { info, data, colorspace, generateFullsize, convertFullsize, extracted, isTransparent } =
+      await this.extractOriginalImage(asset, image, useEdits);
 
     const previewFormat = image.preview.format;
     this.warnOnTransparencyLoss(isTransparent, previewFormat, asset.id);
@@ -305,26 +303,32 @@ export class MediaService extends BaseService {
       fileType: AssetFileType.Preview,
       format: previewFormat,
       isEdited: useEdits,
-      isProgressive: !!image.preview.progressive && previewFormat !== ImageFormat.Webp,
+      isProgressive: !!image.preview.progressive && previewFormat === ImageFormat.Jpeg,
       isTransparent,
     });
     const thumbnailFile = this.getImageFile(asset, {
       fileType: AssetFileType.Thumbnail,
       format: thumbnailFormat,
       isEdited: useEdits,
-      isProgressive: !!image.thumbnail.progressive && thumbnailFormat !== ImageFormat.Webp,
+      isProgressive: !!image.thumbnail.progressive && thumbnailFormat === ImageFormat.Jpeg,
       isTransparent,
     });
     this.storageCore.ensureFolders(previewFile.path);
 
     // generate final images
-    const baseOptions = { colorspace, processInvalidImages: false, raw: info, edits: useEdits ? asset.edits : [] };
-    const thumbnailOptions = { ...image.thumbnail, ...baseOptions, format: thumbnailFormat };
-    const previewOptions = { ...image.preview, ...baseOptions, format: previewFormat };
+    const decoded = { data, info };
+    const baseOptions = { colorspace, processInvalidImages: false, edits: useEdits ? asset.edits : [] };
+    const thumbnailOptions = {
+      ...image.thumbnail,
+      ...baseOptions,
+      format: thumbnailFormat,
+      decodingTier: THUMBNAIL_DECODING_TIER,
+    } as const;
+    const previewOptions = { ...image.preview, ...baseOptions, format: previewFormat, decodingTier: 0 } as const;
     const promises = [
-      this.mediaRepository.generateThumbhash(data, baseOptions),
-      this.mediaRepository.generateThumbnail(data, thumbnailOptions, thumbnailFile.path),
-      this.mediaRepository.generateThumbnail(data, previewOptions, previewFile.path),
+      this.mediaRepository.generateThumbhash(decoded, baseOptions),
+      this.mediaRepository.generateThumbnail(decoded, thumbnailOptions, thumbnailFile.path),
+      this.mediaRepository.generateThumbnail(decoded, previewOptions, previewFile.path),
     ];
 
     let fullsizeFile: UpsertFileOptions | undefined;
@@ -336,7 +340,7 @@ export class MediaService extends BaseService {
         fileType: AssetFileType.FullSize,
         format: fullsizeFormat,
         isEdited: useEdits,
-        isProgressive: !!image.fullsize.progressive && fullsizeFormat !== ImageFormat.Webp,
+        isProgressive: !!image.fullsize.progressive && fullsizeFormat === ImageFormat.Jpeg,
         isTransparent,
       });
       const fullsizeOptions = {
@@ -344,14 +348,15 @@ export class MediaService extends BaseService {
         format: fullsizeFormat,
         quality: image.fullsize.quality,
         progressive: image.fullsize.progressive,
-      };
-      promises.push(this.mediaRepository.generateThumbnail(data, fullsizeOptions, fullsizeFile.path));
+        decodingTier: 0,
+      } as const;
+      promises.push(this.mediaRepository.generateThumbnail(decoded, fullsizeOptions, fullsizeFile.path));
     } else if (generateFullsize && extracted && extracted.format === RawExtractedFormat.Jpeg) {
       fullsizeFile = this.getImageFile(asset, {
         fileType: AssetFileType.FullSize,
         format: extracted.format,
         isEdited: false,
-        isProgressive: !!image.fullsize.progressive && image.fullsize.format !== ImageFormat.Webp,
+        isProgressive: !!image.fullsize.progressive && image.fullsize.format === ImageFormat.Jpeg,
         isTransparent,
       });
       this.storageCore.ensureFolders(fullsizeFile.path);
@@ -416,7 +421,7 @@ export class MediaService extends BaseService {
       inputImage = originalPath;
     }
 
-    const { data: decodedImage, info } = await this.mediaRepository.decodeImage(inputImage, {
+    const decoded = await this.mediaRepository.decodeImage(inputImage, {
       colorspace: image.colorspace,
       processInvalidImages: process.env.IMMICH_PROCESS_INVALID_IMAGES === 'true',
       // if this is an extracted image, it may not have orientation metadata
@@ -429,7 +434,6 @@ export class MediaService extends BaseService {
     const thumbnailOptions: GenerateThumbnailOptions = {
       colorspace: image.colorspace,
       format: ImageFormat.Jpeg,
-      raw: info,
       quality: image.thumbnail.quality,
       progressive: false,
       processInvalidImages: false,
@@ -438,14 +442,18 @@ export class MediaService extends BaseService {
         {
           action: AssetEditAction.Crop,
           parameters: this.getCrop(
-            { old: { width: oldWidth, height: oldHeight }, new: { width: info.width, height: info.height } },
+            {
+              old: { width: oldWidth, height: oldHeight },
+              new: { width: decoded.info.width, height: decoded.info.height },
+            },
             { x1, y1, x2, y2 },
           ),
         },
       ],
+      decodingTier: THUMBNAIL_DECODING_TIER,
     };
 
-    await this.mediaRepository.generateThumbnail(decodedImage, thumbnailOptions, thumbnailPath);
+    await this.mediaRepository.generateThumbnail(decoded, thumbnailOptions, thumbnailPath);
     await this.personRepository.update({ ownerId, personGroupId, thumbnailPath });
 
     return JobStatus.Success;
@@ -492,14 +500,15 @@ export class MediaService extends BaseService {
   private async generateVideoThumbnails(asset: ThumbnailAsset, { ffmpeg, image }: SystemConfig) {
     const previewFile = this.getImageFile(asset, {
       fileType: AssetFileType.Preview,
-      format: image.preview.format,
+      // TODO: write JPEG XL for video thumbnails
+      format: image.preview.format === ImageFormat.Jxl ? ImageFormat.Webp : image.preview.format,
       isEdited: false,
       isProgressive: false,
       isTransparent: false,
     });
     const thumbnailFile = this.getImageFile(asset, {
       fileType: AssetFileType.Thumbnail,
-      format: image.thumbnail.format,
+      format: image.thumbnail.format === ImageFormat.Jxl ? ImageFormat.Webp : image.thumbnail.format,
       isEdited: false,
       isProgressive: false,
       isTransparent: false,
@@ -519,9 +528,14 @@ export class MediaService extends BaseService {
     await this.mediaRepository.transcode(asset.originalPath, previewFile.path, previewOptions);
     await this.mediaRepository.transcode(asset.originalPath, thumbnailFile.path, thumbnailOptions);
 
-    const thumbhash = await this.mediaRepository.generateThumbhash(previewFile.path, {
+    const processInvalidImages = process.env.IMMICH_PROCESS_INVALID_IMAGES === 'true';
+    const preview = await this.mediaRepository.decodeImage(previewFile.path, {
       colorspace: image.colorspace,
-      processInvalidImages: process.env.IMMICH_PROCESS_INVALID_IMAGES === 'true',
+      processInvalidImages,
+    });
+    const thumbhash = await this.mediaRepository.generateThumbhash(preview, {
+      colorspace: image.colorspace,
+      processInvalidImages,
     });
 
     return {
@@ -782,6 +796,7 @@ export class MediaService extends BaseService {
       }
 
       // upsert new file path
+      // eslint-disable-next-line unicorn/prefer-continue
       if (
         existingFile?.path !== newFile.path ||
         existingFile.isProgressive !== newFile.isProgressive ||
@@ -841,7 +856,10 @@ export class MediaService extends BaseService {
     await this.personRepository.updateVisibility(faceStatuses.visible, faceStatuses.hidden);
 
     const ocrStatuses = checkOcrVisibility(ocrData, originalDimensions, cropBox);
-    await this.ocrRepository.updateOcrVisibilities(asset.id, ocrStatuses.visible, ocrStatuses.hidden);
+    const searchText = (cropBox ? ocrStatuses.visible : ocrData)
+      .flatMap(({ text }) => tokenizeForSearch(text))
+      .join(' ');
+    await this.ocrRepository.updateOcrVisibilities(asset.id, ocrStatuses.visible, ocrStatuses.hidden, searchText);
 
     return generated;
   }

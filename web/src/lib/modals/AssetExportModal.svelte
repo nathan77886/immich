@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { downloadUrl } from '$lib/utils';
-  import { toastManager, Button, Modal, ModalBody, ModalFooter } from '@immich/ui';
+  import { downloadUrl } from '#lib/utils.ts';
+  import { Button, Modal, ModalBody, ModalFooter, toastManager } from '@immich/ui';
 
   type ExportItem = {
     id: string;

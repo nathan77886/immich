@@ -1,13 +1,14 @@
 import { Kysely } from 'kysely';
-import { SyncEntityType, SyncRequestType } from 'src/enum';
-import { OcrRepository } from 'src/repositories/ocr.repository';
-import { DB } from 'src/schema';
-import { SyncTestContext } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
-import { getKyselyDB } from 'test/utils';
+import { SyncEntityType, SyncRequestType } from 'src/enum.js';
+import { OcrRepository } from 'src/repositories/ocr.repository.js';
+import { DB } from 'src/schema/index.js';
+import { SyncTestContext } from 'test/medium.factory.js';
+import { factory } from 'test/small.factory.js';
+import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
 
+// eslint-disable-next-line unicorn/no-unnecessary-parameters
 const setup = async (db?: Kysely<DB>) => {
   const ctx = new SyncTestContext(db || defaultDatabase);
   const { auth, user, session } = await ctx.newSyncAuthUser();
@@ -340,6 +341,7 @@ describe(SyncEntityType.AssetOcrV1, () => {
       asset.id,
       [],
       [factory.assetOcr({ id: ocrId, assetId: asset.id, text: 'Hello World' })],
+      '',
     );
 
     const updatedResponse = await ctx.syncStream(auth, [SyncRequestType.AssetOcrV1]);
