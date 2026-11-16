@@ -1,15 +1,15 @@
-import { AdminConfigDto, defaults, SystemConfig } from 'src/dtos/config.dto';
-import { AssetFileType, JobName, JobStatus, UserMetadataKey } from 'src/enum';
-import { NotificationService } from 'src/services/notification.service';
-import { AlbumFactory } from 'test/factories/album.factory';
-import { AssetFileFactory } from 'test/factories/asset-file.factory';
-import { AssetFactory } from 'test/factories/asset.factory';
-import { UserFactory } from 'test/factories/user.factory';
-import { notificationStub } from 'test/fixtures/notification.stub';
-import { userStub } from 'test/fixtures/user.stub';
-import { getForAlbum } from 'test/mappers';
-import { newUuid } from 'test/small.factory';
-import { newTestService, ServiceMocks } from 'test/utils';
+import { AdminConfigDto, SystemConfig, defaults } from 'src/dtos/config.dto.js';
+import { AssetFileType, JobName, JobStatus, UserMetadataKey } from 'src/enum.js';
+import { NotificationService } from 'src/services/notification.service.js';
+import { AlbumFactory } from 'test/factories/album.factory.js';
+import { AssetFileFactory } from 'test/factories/asset-file.factory.js';
+import { AssetFactory } from 'test/factories/asset.factory.js';
+import { UserFactory } from 'test/factories/user.factory.js';
+import { notificationStub } from 'test/fixtures/notification.stub.js';
+import { userStub } from 'test/fixtures/user.stub.js';
+import { getForAlbum } from 'test/mappers.js';
+import { newUuid } from 'test/small.factory.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const configs = {
   smtpDisabled: Object.freeze<SystemConfig>({
@@ -67,6 +67,27 @@ describe(NotificationService.name, () => {
       expect(sut.onConfigUpdate(update)).toBeUndefined();
       expect(mocks.websocket.clientBroadcast).toHaveBeenCalledWith('on_config_update');
       expect(mocks.websocket.serverSend).toHaveBeenCalledWith('ConfigUpdate', update);
+    });
+  });
+
+  describe('onLibraryCreate', () => {
+    it('should relay the event to other servers', () => {
+      sut.onLibraryCreate();
+      expect(mocks.websocket.serverSend).toHaveBeenCalledWith('LibraryCreate');
+    });
+  });
+
+  describe('onLibraryUpdate', () => {
+    it('should relay the event to other servers', () => {
+      sut.onLibraryUpdate();
+      expect(mocks.websocket.serverSend).toHaveBeenCalledWith('LibraryUpdate');
+    });
+  });
+
+  describe('onLibraryDelete', () => {
+    it('should relay the event to other servers', () => {
+      sut.onLibraryDelete();
+      expect(mocks.websocket.serverSend).toHaveBeenCalledWith('LibraryDelete');
     });
   });
 

@@ -1,8 +1,8 @@
 import { CookieOptions, Response } from 'express';
 import { Duration } from 'luxon';
 import { Writable } from 'node:stream';
-import { CookieResponse } from 'src/dtos/auth.dto';
-import { ImmichCookie } from 'src/enum';
+import { CookieResponse } from 'src/dtos/auth.dto.js';
+import { ImmichCookie } from 'src/enum.js';
 
 export class ClientDisconnectedError extends Error {}
 
@@ -60,6 +60,9 @@ export const respondWithCookie = <T>(res: Response, body: T, { isSecure, values 
   };
 
   for (const { key, value } of values) {
+    if (value === null) {
+      continue;
+    }
     const options = cookieOptions[key];
     res.cookie(key, value, options);
   }

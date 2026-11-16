@@ -1,11 +1,13 @@
+import { WorkflowTrigger } from '@immich/plugin-sdk';
 import { ShallowDehydrateObject } from 'kysely';
-import { VECTOR_EXTENSIONS } from 'src/constants';
-import { AssetFile } from 'src/database';
-import { UploadFieldName } from 'src/dtos/asset-media.dto';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { SystemConfig } from 'src/dtos/config.dto';
-import { AssetEditActionItem } from 'src/dtos/editing.dto';
-import { SetMaintenanceModeDto } from 'src/dtos/maintenance.dto';
+import { Mocked } from 'vitest';
+import { VECTOR_EXTENSIONS } from 'src/constants.js';
+import { AssetFile } from 'src/database.js';
+import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { SystemConfig } from 'src/dtos/config.dto.js';
+import { AssetEditActionItem } from 'src/dtos/editing.dto.js';
+import { SetMaintenanceModeDto } from 'src/dtos/maintenance.dto.js';
 import {
   AacProfile,
   AssetOrder,
@@ -23,14 +25,14 @@ import {
   IntegrityReport,
   JobName,
   MemoryType,
+  PersonUpdateStrategy,
   QueueName,
   StorageFolder,
   SyncEntityType,
   SystemMetadataKey,
   TranscodeTarget,
   UserMetadataKey,
-} from 'src/enum';
-import { Mocked } from 'vitest';
+} from 'src/enum.js';
 
 export type DeepPartial<T> = T extends Date
   ? T
@@ -42,19 +44,14 @@ export type DeepPartial<T> = T extends Date
 
 export type RepositoryInterface<T extends object> = Pick<T, keyof T>;
 
-export type FullsizeImageOptions = {
-  format: ImageFormat;
-  quality: number;
-  enabled: boolean;
-  progressive?: boolean;
-};
-
 export type ImageOptions = {
   format: ImageFormat;
   quality: number;
-  size: number;
   progressive?: boolean;
+  decodingTier: 0 | 1 | 2 | 3 | 4;
 };
+
+export type FullsizeImageOptions = ImageOptions & { enabled: boolean };
 
 export type RawImageInfo = {
   width: number;
@@ -62,20 +59,29 @@ export type RawImageInfo = {
   channels: 1 | 2 | 3 | 4;
 };
 
-type DecodeImageOptions = {
-  colorspace: string;
-  processInvalidImages: boolean;
-  raw?: RawImageInfo;
-  edits?: AssetEditActionItem[];
+export type Bitmap = {
+  data: Buffer;
+  info: RawImageInfo;
 };
 
-export interface DecodeToBufferOptions extends DecodeImageOptions {
+type ImageColorOptions = {
+  colorspace: string;
+  processInvalidImages: boolean;
+};
+
+export interface DecodeToBufferOptions extends ImageColorOptions {
   size?: number;
   orientation?: ExifOrientation;
 }
 
-export type GenerateThumbnailOptions = Pick<ImageOptions, 'format' | 'quality' | 'progressive'> & DecodeToBufferOptions;
-export type GenerateThumbhashOptions = DecodeImageOptions;
+export type TransformOptions = {
+  size?: number;
+  fit?: 'inside' | 'outside';
+  edits?: AssetEditActionItem[];
+};
+
+export type GenerateThumbnailOptions = ImageOptions & ImageColorOptions & TransformOptions;
+export type GenerateThumbhashOptions = ImageColorOptions & Pick<TransformOptions, 'edits'>;
 
 export interface VideoStreamInfo {
   index: number;
@@ -331,7 +337,6 @@ export interface JobCounts {
   failed: number;
   delayed: number;
   waiting: number;
-  paused: number;
 }
 
 export type JobItem =
@@ -400,6 +405,7 @@ export type JobItem =
 
   // Cleanup
   | { name: JobName.SessionCleanup; data?: IBaseJob }
+  | { name: JobName.AuthChallengeCleanup; data?: IBaseJob }
   | { name: JobName.HlsSessionCleanup; data?: IBaseJob }
 
   // Tags
@@ -434,7 +440,7 @@ export type JobItem =
   | { name: JobName.Ocr; data: IEntityJob }
 
   // Workflow
-  | { name: JobName.WorkflowAssetTrigger; data: { workflowId: string; assetId: string } }
+  | { name: JobName.WorkflowAssetTrigger; data: { workflowId: string; assetId: string; trigger: WorkflowTrigger } }
 
   // Integrity
   | { name: JobName.IntegrityUntrackedFilesQueueAll; data?: IIntegrityJob }
@@ -521,9 +527,11 @@ export type StorageAsset = {
 };
 
 export type OnThisDayData = { year: number };
+export type BirthdayData = { personId: string; personName: string; year: number };
 
 export interface MemoryData {
   [MemoryType.OnThisDay]: OnThisDayData;
+  [MemoryType.Birthday]: BirthdayData;
 }
 
 export type VersionCheckMetadata = { checkedAt: string; releaseVersion: string };
@@ -567,6 +575,7 @@ export type UserPreferences = {
     enabled: boolean;
     sidebarWeb: boolean;
     minimumFaces: number;
+    updateStrategy: PersonUpdateStrategy;
   };
   ratings: {
     enabled: boolean;

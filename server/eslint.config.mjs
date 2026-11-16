@@ -1,14 +1,17 @@
 import js from '@eslint/js';
-import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import eslintConfigPrettier from 'eslint-config-prettier/flat';
+import { importX } from 'eslint-plugin-import-x';
 import eslintPluginUnicorn from 'eslint-plugin-unicorn';
+import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import typescriptEslint from 'typescript-eslint';
 
-export default typescriptEslint.config([
+export default defineConfig([
   eslintPluginUnicorn.configs.recommended,
-  eslintPluginPrettierRecommended,
   js.configs.recommended,
   typescriptEslint.configs.recommended,
+  importX.flatConfigs.recommended,
+  importX.flatConfigs.typescript,
   {
     ignores: ['eslint.config.mjs'],
   },
@@ -61,6 +64,10 @@ export default typescriptEslint.config([
       'unicorn/no-computed-property-existence-check': 'off',
       'unicorn/no-non-function-verb-prefix': 'off',
       'unicorn/prefer-simple-condition-first': 'off',
+      'unicorn/prefer-ternary': 'off',
+      'unicorn/prefer-combined-guards': 'off',
+      'unicorn/no-immediate-mutation': 'off',
+      'unicorn/prefer-minimal-ternary': 'off',
       // prefer the typescript-eslint type-aware version
       'unicorn/require-array-sort-compare': 'off',
       '@typescript-eslint/require-array-sort-compare': 'error',
@@ -70,9 +77,10 @@ export default typescriptEslint.config([
       'require-await': 'off',
       '@typescript-eslint/require-await': 'error',
       curly: 2,
-      'prettier/prettier': 0,
       'object-shorthand': ['error', 'always'],
       eqeqeq: 'error',
+      'import-x/no-named-as-default': 'off',
+      'import-x/no-empty-named-blocks': 'error',
 
       'no-restricted-imports': [
         'error',
@@ -95,4 +103,5 @@ export default typescriptEslint.config([
       ],
     },
   },
+  eslintConfigPrettier,
 ]);

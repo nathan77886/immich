@@ -1,21 +1,23 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { SignJWT } from 'jose';
-import { MaintenanceAction, SystemMetadataKey } from 'src/enum';
-import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository';
-import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-websocket.repository';
-import { MaintenanceWorkerService } from 'src/maintenance/maintenance-worker.service';
-import { DatabaseBackupService } from 'src/services/database-backup.service';
-import { automock, AutoMocked, getMocks, ServiceMocks } from 'test/utils';
+import { MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
+import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
+import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-websocket.repository.js';
+import { MaintenanceWorkerService } from 'src/maintenance/maintenance-worker.service.js';
+import { DatabaseBackupService } from 'src/services/database-backup.service.js';
+import { AutoMocked, ServiceMocks, automock, getMocks } from 'test/utils.js';
 
 describe(MaintenanceWorkerService.name, () => {
   let sut: MaintenanceWorkerService;
   let mocks: ServiceMocks;
+  let moduleRefMock: { get: ReturnType<typeof vitest.fn> };
   let maintenanceWebsocketRepositoryMock: AutoMocked<MaintenanceWebsocketRepository>;
   let maintenanceHealthRepositoryMock: AutoMocked<MaintenanceHealthRepository>;
   let databaseBackupServiceMock: AutoMocked<DatabaseBackupService>;
 
   beforeEach(() => {
     mocks = getMocks();
+    moduleRefMock = { get: vitest.fn() };
     maintenanceWebsocketRepositoryMock = automock(MaintenanceWebsocketRepository, {
       args: [mocks.logger],
       strict: false,
@@ -50,6 +52,7 @@ describe(MaintenanceWorkerService.name, () => {
       mocks.process,
       mocks.database as never,
       databaseBackupServiceMock,
+      moduleRefMock as never,
     );
 
     sut.mock({
@@ -282,9 +285,7 @@ describe(MaintenanceWorkerService.name, () => {
 
   describe.skip('setAction'); // just calls setStatus+runAction
 
-  /**
-   * Actions
-   */
+  /** Actions */
 
   describe('action: start', () => {
     it('should not do anything', async () => {

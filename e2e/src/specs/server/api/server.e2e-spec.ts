@@ -1,6 +1,6 @@
 import { LoginResponseDto } from '@immich/sdk';
-import { createUserDto } from 'src/fixtures';
-import { app, utils } from 'src/utils';
+import { createUserDto } from 'src/fixtures.js';
+import { app, utils } from 'src/utils.js';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -98,6 +98,7 @@ describe('/server', () => {
         configFile: false,
         duplicateDetection: false,
         facialRecognition: false,
+        backups: false,
         map: true,
         reverseGeocoding: true,
         importFaces: false,

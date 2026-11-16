@@ -1,11 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { Readable } from 'node:stream';
-import { DownloadResponseDto } from 'src/dtos/download.dto';
-import { DownloadService } from 'src/services/download.service';
-import { AssetFactory } from 'test/factories/asset.factory';
-import { authStub } from 'test/fixtures/auth.stub';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 import { vitest } from 'vitest';
+import { DownloadResponseDto } from 'src/dtos/download.dto.js';
+import { DownloadService } from 'src/services/download.service.js';
+import { AssetFactory } from 'test/factories/asset.factory.js';
+import { authStub } from 'test/fixtures/auth.stub.js';
+import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 const downloadResponse: DownloadResponseDto = {
   totalSize: 105_000,
@@ -48,6 +48,49 @@ describe(DownloadService.name, () => {
 
       expect(archiveMock.addFile).toHaveBeenCalledTimes(1);
       expect(archiveMock.addFile).toHaveBeenNthCalledWith(1, asset.originalPath, asset.originalFileName);
+    });
+
+    it('should return the original file when the unedited version is requested', async () => {
+      const archiveMock = {
+        addFile: vitest.fn(),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+      const asset = AssetFactory.create();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([asset]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: false })).resolves.toEqual({
+        stream: archiveMock.stream,
+      });
+
+      expect(mocks.asset.getForOriginals).toHaveBeenCalledWith([asset.id], false);
+      expect(archiveMock.addFile).toHaveBeenCalledWith(asset.originalPath, asset.originalFileName);
+    });
+
+    it('should not return the unedited version when requested using a shared link', async () => {
+      const archiveMock = {
+        addFile: vitest.fn(),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+      const asset = AssetFactory.create({ originalFileName: 'foo.heic' });
+      const editedPath = '/data/edited.jpg';
+
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([{ ...asset, editedPath }]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+      await expect(
+        sut.downloadArchive(authStub.adminSharedLink, { assetIds: [asset.id], edited: false }),
+      ).resolves.toEqual({
+        stream: archiveMock.stream,
+      });
+
+      expect(mocks.asset.getForOriginals).toHaveBeenCalledWith([asset.id], true);
+      expect(archiveMock.addFile).toHaveBeenCalledWith(editedPath, 'foo.jpg');
     });
 
     it('should log a warning if the original path could not be resolved', async () => {
@@ -147,9 +190,9 @@ describe(DownloadService.name, () => {
       { input: String.raw`C:\temp\abs3.jpg`, expected: 'Ctempabs3.jpg' },
       { input: 'a/../../b.jpg', expected: 'a....b.jpg' },
       { input: String.raw`..\..\win1.jpg`, expected: '....win1.jpg' },
-      { input: '/etc/passwd', expected: 'etcpasswd' },
-      { input: '..', expected: 'unnamed' },
-      { input: '', expected: 'unnamed' },
+      { input: '/etc/passwd', expected: 'etcpasswd.jpg' },
+      { input: '..', expected: 'unnamed.jpg' },
+      { input: '', expected: 'unnamed.jpg' },
     ])('should sanitize unsafe originalFileName "$input" to "$expected"', async ({ input, expected }) => {
       const archiveMock = {
         addFile: vitest.fn(),

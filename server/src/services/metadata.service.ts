@@ -1,15 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ContainerDirectoryItem, ExifDateTime, Tags } from 'exiftool-vendored';
 import { Insertable } from 'kysely';
-import _ from 'lodash';
+import { isUndefined, omitBy, pick } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
 import { Stats } from 'node:fs';
 import { constants } from 'node:fs/promises';
 import { join, parse } from 'node:path';
-
-import { StorageCore } from 'src/cores/storage.core';
-import { Asset, AssetFile } from 'src/database';
-import { OnEvent, OnJob } from 'src/decorators';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { Asset, AssetFile } from 'src/database.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
 import {
   AssetFileType,
   AssetType,
@@ -22,21 +21,21 @@ import {
   JobStatus,
   QueueName,
   SourceType,
-} from 'src/enum';
-import { ArgOf } from 'src/repositories/event.repository';
-import { ReverseGeocodeResult } from 'src/repositories/map.repository';
-import { ImmichTags } from 'src/repositories/metadata.repository';
-import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
-import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { BaseService } from 'src/services/base.service';
-import { JobOf } from 'src/types';
-import { getAssetFiles } from 'src/utils/asset.util';
-import { isAssetChecksumConstraint } from 'src/utils/database';
-import { mergeTimeZone } from 'src/utils/date';
-import { mimeTypes } from 'src/utils/mime-types';
-import { batched, isFaceImportEnabled } from 'src/utils/misc';
-import { upsertTags } from 'src/utils/tag';
-import { Tasks } from 'src/utils/tasks';
+} from 'src/enum.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import { ReverseGeocodeResult } from 'src/repositories/map.repository.js';
+import { ImmichTags } from 'src/repositories/metadata.repository.js';
+import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
+import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
+import { BaseService } from 'src/services/base.service.js';
+import type { JobOf } from 'src/types.js';
+import { getAssetFiles } from 'src/utils/asset.util.js';
+import { isAssetChecksumConstraint } from 'src/utils/database.js';
+import { mergeTimeZone } from 'src/utils/date.js';
+import { mimeTypes } from 'src/utils/mime-types.js';
+import { batched, isFaceImportEnabled } from 'src/utils/misc.js';
+import { upsertTags } from 'src/utils/tag.js';
+import { Tasks } from 'src/utils/tasks.js';
 
 const POSTGRES_INT_MAX = 2_147_483_647;
 const POSTGRES_INT_MIN = -2_147_483_648;
@@ -286,11 +285,20 @@ export class MetadataService extends BaseService {
 
       // camera
       make:
-        exifTags.Make ?? exifTags.Device?.Manufacturer ?? exifTags.AndroidMake ?? (exifTags.DeviceManufacturer || null),
+        exifTags.Make ??
+        exifTags.Device?.Manufacturer ??
+        exifTags.AndroidMake ??
+        exifTags.DeviceManufacturer ??
+        (exifTags.SamsungModel ? 'Samsung' : null),
       model:
-        exifTags.Model ?? exifTags.Device?.ModelName ?? exifTags.AndroidModel ?? (exifTags.DeviceModelName || null),
+        exifTags.Model ??
+        exifTags.Device?.ModelName ??
+        exifTags.AndroidModel ??
+        exifTags.DeviceModelName ??
+        exifTags.Author ??
+        null,
       fps: video?.frameRate ?? validate(Number(exifTags.VideoFrameRate!)),
-      iso: validate(exifTags.ISO) as number,
+      iso: validate(exifTags.RecommendedExposureIndex || exifTags.StandardOutputSensitivity || exifTags.ISO) as number,
       exposureTime: exifTags.ExposureTime ?? null,
       lensModel: getLensModel(exifTags),
       fNumber: validate(exifTags.FNumber),
@@ -440,7 +448,7 @@ export class MetadataService extends BaseService {
 
     const { sidecarFile } = getAssetFiles(asset.files);
 
-    const isChanged = sidecarPath !== sidecarFile?.path;
+    const isChanged = sidecarPath !== (sidecarFile?.path ?? null);
 
     if (sidecarFile?.path || sidecarPath) {
       this.logger.debug(
@@ -484,7 +492,7 @@ export class MetadataService extends BaseService {
     const { sidecarFile } = getAssetFiles(asset.files);
     const sidecarPath = sidecarFile?.path || `${asset.originalPath}.xmp`;
 
-    const { description, dateTimeOriginal, latitude, longitude, rating, tags, timeZone } = _.pick(
+    const { description, dateTimeOriginal, latitude, longitude, rating, tags, timeZone } = pick(
       {
         description: asset.exifInfo.description,
         dateTimeOriginal: asset.exifInfo.dateTimeOriginal,
@@ -497,7 +505,7 @@ export class MetadataService extends BaseService {
       lockedProperties,
     );
 
-    const exif = _.omitBy(
+    const exif = omitBy(
       <Tags>{
         Description: description,
         ImageDescription: description,
@@ -507,7 +515,7 @@ export class MetadataService extends BaseService {
         Rating: rating,
         TagsList: tags,
       },
-      _.isUndefined,
+      isUndefined,
     );
 
     if (Object.keys(exif).length === 0) {
@@ -585,7 +593,7 @@ export class MetadataService extends BaseService {
         //
         // this is especially important in the case of UTC+0 where exiftool-vendored does not return tz/zone fields
         // and as such the tags aren't overwritten when returning all tags.
-        for (const tag of ['zone', 'tz', 'tzSource'] as const) {
+        for (const tag of ['zone', 'tz', 'zoneSource'] as const) {
           delete mediaTags[tag];
         }
       }
@@ -709,6 +717,13 @@ export class MetadataService extends BaseService {
       }
       // Default video extraction
       else {
+        if (length <= 0 || padding < 0 || position < 0) {
+          this.logger.warn(
+            `Skipping motion photo video extraction for asset ${asset.id}: video range is outside the file`,
+          );
+          return;
+        }
+
         video = await this.storageRepository.readFile(asset.originalPath, {
           buffer: Buffer.alloc(length),
           position,
@@ -781,9 +796,12 @@ export class MetadataService extends BaseService {
         // (if it did, getByChecksum() would've returned a motionAsset with the same ID as livePhotoVideoId)
         // note asset.livePhotoVideoId is not motionAsset.id yet
         if (asset.livePhotoVideoId) {
+          // the old motion may be the user's own file (linked by livePhotoCID or manually), only remove ones Immich extracted
+          const oldMotion = await this.assetRepository.getById(asset.livePhotoVideoId);
+          const deleteOnDisk = !!oldMotion && StorageCore.isAndroidMotionPath(oldMotion.originalPath);
           await this.jobRepository.queue({
             name: JobName.AssetDelete,
-            data: { id: asset.livePhotoVideoId, deleteOnDisk: true },
+            data: { id: asset.livePhotoVideoId, deleteOnDisk },
           });
           this.logger.log(`Removed old motion photo video asset (${asset.livePhotoVideoId})`);
         }
@@ -944,15 +962,17 @@ export class MetadataService extends BaseService {
       };
 
       facesToAdd.push(face);
-      if (!existingNameMap.has(loweredName)) {
-        missing.push({
-          personGroupId,
-          ownerId: asset.ownerId,
-          clusterGroupId: asset.clusterGroupId,
-          name: region.Name,
-        });
-        missingWithFaceAsset.push({ personGroupId, ownerId: asset.ownerId, faceAssetId: face.id });
+      if (existingNameMap.has(loweredName)) {
+        continue;
       }
+
+      missing.push({
+        personGroupId,
+        ownerId: asset.ownerId,
+        clusterGroupId: asset.clusterGroupId,
+        name: region.Name,
+      });
+      missingWithFaceAsset.push({ personGroupId, ownerId: asset.ownerId, faceAssetId: face.id });
     }
 
     if (missing.length > 0) {

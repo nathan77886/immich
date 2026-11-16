@@ -3,14 +3,14 @@ import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants';
-import { StorageCore } from 'src/cores/storage.core';
-import { OnEvent, OnJob } from 'src/decorators';
+import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants.js';
+import { StorageCore } from 'src/cores/storage.core.js';
+import { OnEvent, OnJob } from 'src/decorators.js';
 import {
   IntegrityGetReportDto,
   IntegrityReportResponseDto,
   IntegrityReportSummaryResponseDto,
-} from 'src/dtos/integrity.dto';
+} from 'src/dtos/integrity.dto.js';
 import {
   AssetStatus,
   CacheControl,
@@ -22,44 +22,44 @@ import {
   QueueName,
   StorageFolder,
   SystemMetadataKey,
-} from 'src/enum';
-import { ArgOf } from 'src/repositories/event.repository';
-import { BaseService } from 'src/services/base.service';
-import {
-  IIntegrityDeleteReportsJob,
+} from 'src/enum.js';
+import type { ArgOf } from 'src/repositories/event.repository.js';
+import { BaseService } from 'src/services/base.service.js';
+import type {
   IIntegrityDeleteReportTypeJob,
+  IIntegrityDeleteReportsJob,
   IIntegrityJob,
   IIntegrityMissingFilesJob,
   IIntegrityPathWithChecksumJob,
   IIntegrityPathWithReportJob,
   IIntegrityUntrackedFilesJob,
-} from 'src/types';
-import { ImmichFileResponse } from 'src/utils/file';
-import { batched, handlePromiseError } from 'src/utils/misc';
+} from 'src/types.js';
+import { ImmichFileResponse } from 'src/utils/file.js';
+import { batched, handlePromiseError } from 'src/utils/misc.js';
 
 /**
- * Untracked Files:
- *   Files are detected in /data/encoded-video, /data/library, /data/upload
- *     Checked against the asset table
- *   Files are detected in /data/thumbs
- *     Checked against the asset_file table
- *
- *   * Can perform download or delete of files
- *
- * Missing Files:
- *   Paths are queried from asset(originalPath, encodedVideoPath), asset_file(path)
- *     Check whether files exist on disk
- *
- *   * Reports must include origin (asset or asset_file) & ID for further action
- *   * Can perform trash (asset) or delete (asset_file)
- *
- * Checksum Mismatch:
- *   Paths & checksums are queried from asset(originalPath, checksum)
- *     Check whether files match checksum, missing files ignored
- *
- *   * Reports must include origin (as above) for further action
- *   * Can perform download or trash (asset)
- */
+Untracked Files:
+  Files are detected in /data/encoded-video, /data/library, /data/upload
+    Checked against the asset table
+  Files are detected in /data/thumbs
+    Checked against the asset_file table
+
+Can perform download or delete of files
+
+Missing Files:
+  Paths are queried from asset(originalPath, encodedVideoPath), asset_file(path)
+    Check whether files exist on disk
+
+Reports must include origin (asset or asset_file) & ID for further action
+Can perform trash (asset) or delete (asset_file)
+
+Checksum Mismatch:
+  Paths & checksums are queried from asset(originalPath, checksum)
+    Check whether files match checksum, missing files ignored
+
+Reports must include origin (as above) for further action
+Can perform download or trash (asset)
+*/
 
 @Injectable()
 export class IntegrityService extends BaseService {
@@ -275,38 +275,42 @@ export class IntegrityService extends BaseService {
   async handleUntrackedFiles({ type, paths }: IIntegrityUntrackedFilesJob): Promise<JobStatus> {
     this.logger.log(`Processing batch of ${paths.length} files to check if they are untracked.`);
 
-    const untrackedFiles = new Set<string>(paths);
+    const lookupPaths = [...new Set(paths.flatMap((path) => [path, path.normalize('NFC'), path.normalize('NFD')]))];
+
+    const trackedPaths = new Set<string>();
     if (type === 'asset') {
-      const assets = await this.integrityRepository.getAssetPathsByPaths(paths);
+      const assets = await this.integrityRepository.getAssetPathsByPaths(lookupPaths);
       for (const { originalPath, encodedVideoPath } of assets) {
-        untrackedFiles.delete(originalPath);
+        trackedPaths.add(originalPath.normalize('NFC'));
 
         if (encodedVideoPath) {
-          untrackedFiles.delete(encodedVideoPath);
+          trackedPaths.add(encodedVideoPath.normalize('NFC'));
         }
       }
     } else {
-      const assets = await this.integrityRepository.getAssetFilePathsByPaths(paths);
+      const assets = await this.integrityRepository.getAssetFilePathsByPaths(lookupPaths);
       for (const { path } of assets) {
-        untrackedFiles.delete(path);
+        trackedPaths.add(path.normalize('NFC'));
       }
     }
 
-    const personThumbnailPaths = await this.integrityRepository.getPersonThumbnailPathsByPaths(paths);
+    const personThumbnailPaths = await this.integrityRepository.getPersonThumbnailPathsByPaths(lookupPaths);
     for (const { thumbnailPath } of personThumbnailPaths) {
-      untrackedFiles.delete(thumbnailPath);
+      trackedPaths.add(thumbnailPath.normalize('NFC'));
     }
 
-    if (untrackedFiles.size > 0) {
+    const untrackedFiles = [...new Set(paths)].filter((path) => !trackedPaths.has(path.normalize('NFC')));
+
+    if (untrackedFiles.length > 0) {
       await this.integrityRepository.create(
-        [...untrackedFiles].map((path) => ({
+        untrackedFiles.map((path) => ({
           type: IntegrityReport.UntrackedFile,
           path,
         })),
       );
     }
 
-    this.logger.log(`Processed ${paths.length} and found ${untrackedFiles.size} untracked file(s).`);
+    this.logger.log(`Processed ${paths.length} and found ${untrackedFiles.length} untracked file(s).`);
     return JobStatus.Success;
   }
 

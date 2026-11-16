@@ -1,7 +1,7 @@
-import { AuthDto } from 'src/dtos/auth.dto';
-import { SearchFilter, SearchFilterBranch } from 'src/dtos/search.dto';
-import { AssetVisibility } from 'src/enum';
-import { requireElevatedPermission } from 'src/utils/access';
+import { AuthDto } from 'src/dtos/auth.dto.js';
+import { SearchFilter, SearchFilterBranch } from 'src/dtos/search.dto.js';
+import { AssetVisibility } from 'src/enum.js';
+import { requireElevatedPermission } from 'src/utils/access.js';
 
 type EnumField = 'type' | 'visibility';
 type EnumOperator = keyof NonNullable<SearchFilterBranch[EnumField]>;
@@ -25,9 +25,7 @@ const canMatch = <T>(condition: EnumCondition<T>, value: T): boolean => {
   );
 };
 
-/**
- * The conditions that decide which `field` values the filter can return. A top-level condition decides alone, otherwise each branch itself.
- */
+/** The conditions that decide which `field` values the filter can return. A top-level condition decides alone, otherwise each branch itself. */
 const decidingConditions = <F extends EnumField>(filter: SearchFilter, field: F) => {
   if (filter[field] !== undefined) {
     return [filter[field]];
@@ -39,9 +37,9 @@ const decidingConditions = <F extends EnumField>(filter: SearchFilter, field: F)
 };
 
 /**
- * Keeps locked assets out of search results unless the session is elevated: a filter that asks for
- * them is rejected with 401, and any other filter gets `visibility != locked` ANDed in.
- */
+Keeps locked assets out of search results unless the session is elevated: a filter that asks for
+them is rejected with 401, and any other filter gets `visibility != locked` ANDed in.
+*/
 export const applyLockedVisibilityPolicy = (auth: AuthDto, filter: SearchFilter): SearchFilter => {
   if (auth.session?.hasElevatedPermission) {
     return filter;

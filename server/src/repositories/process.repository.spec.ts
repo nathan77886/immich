@@ -1,7 +1,7 @@
 import { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { ProcessRepository } from 'src/repositories/process.repository';
+import { ProcessRepository } from 'src/repositories/process.repository.js';
 
 function* data() {
   yield 'Hello, world!';
@@ -24,6 +24,16 @@ describe(ProcessRepository.name, () => {
       final(callback) {
         callback();
       },
+    });
+  });
+
+  describe('isCommandAvailable', () => {
+    it('should find an executable on the PATH', async () => {
+      await expect(sut.isCommandAvailable('bash')).resolves.toBe(true);
+    });
+
+    it('should not find a missing executable', async () => {
+      await expect(sut.isCommandAvailable('immich-missing-command')).resolves.toBe(false);
     });
   });
 
